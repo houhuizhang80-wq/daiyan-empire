@@ -21,7 +21,11 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--font-ui);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+/* 移动端：禁止横屏字号自动放大、去掉双击缩放延迟 */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+button,input,select,a{touch-action:manipulation}
 button,input,select{font-family:inherit;font-size:inherit;color:inherit}
+img,table{max-width:100%}
 .hidden{display:none !important}
 h1,h2,h3,h4{margin:0;font-weight:500;font-family:var(--font)}
 
@@ -34,6 +38,8 @@ h1,h2,h3,h4{margin:0;font-weight:500;font-family:var(--font)}
 .btn.ghost{background:transparent}
 .btn.sm{padding:4px 10px;font-size:13px}
 .btn.block{width:100%;text-align:center}
+/* 顶栏主按钮的两种文案：窄屏用短版，否则会在小屏被裁 */
+.lb-mini{display:none}
 input,select{border:1px solid var(--line-2);background:var(--paper-2);border-radius:var(--r-sm);padding:7px 10px;outline:none}
 input:focus,select:focus{border-color:var(--gold)}
 
@@ -48,15 +54,22 @@ input:focus,select:focus{border-color:var(--gold)}
 .strip b{color:var(--ink);font-weight:500}
 .strip .warn{color:var(--seal)}
 
-/* ── 主体三栏 ── */
+/* ── 主体：宽屏三栏 → 中屏两栏 → 手机单列 ── */
 .grid{display:grid;grid-template-columns:230px minmax(0,1fr) 320px;gap:16px;margin-top:16px;align-items:start}
-@media (max-width:1080px){.grid{grid-template-columns:200px minmax(0,1fr)}.rail{grid-column:1/-1}}
-@media (max-width:720px){.grid{grid-template-columns:1fr}.side,.rail{grid-column:1/-1}}
+@media (min-width:1500px){.wrap{max-width:1440px}.grid{grid-template-columns:260px minmax(0,1fr) 360px}}
+@media (max-width:1080px){
+  .grid{grid-template-columns:200px minmax(0,1fr);gap:14px}
+  .rail{grid-column:1/-1}
+}
 
 .card{background:var(--paper-2);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:14px;margin-bottom:14px}
-.card h3{font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.card h3 .pill{margin-left:auto}
-.pill{display:inline-block;background:var(--paper-3);border:1px solid var(--line-2);border-radius:20px;padding:1px 9px;font-size:12px;color:var(--ink-2)}
+.card h3{font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;row-gap:4px}
+/* 标题里的标签：按内容宽度渲染，不参与 flex 收缩
+   （否则 CJK 的最小内容宽度只有 1 个字，"从九品书办" 会被压成竖排） */
+.card h3 .pill{margin-left:auto;flex:none;width:max-content;max-width:100%}
+/* 标签一律不折行、不被压扁 —— 窄容器里 "从九品书办" 曾被挤成竖排两列。
+   CJK 的 min-content 只有一个字宽，故必须用 max-content 撑开，否则 flex 会把它压到 1 字宽 */
+.pill{display:inline-block;background:var(--paper-3);border:1px solid var(--line-2);border-radius:20px;padding:1px 9px;font-size:12px;color:var(--ink-2);white-space:nowrap;flex:none;width:max-content;max-width:100%}
 .pill.seal{background:var(--seal-soft);border-color:#e6c9c6;color:var(--seal)}
 .pill.jade{background:var(--jade-soft);border-color:#c6e0d1;color:var(--jade)}
 .pill.gold{background:var(--gold-soft);border-color:#e6d7ae;color:var(--gold)}
@@ -86,7 +99,7 @@ input:focus,select:focus{border-color:var(--gold)}
 .acts-group .g-title{font-size:13px;color:var(--ink-3);letter-spacing:1px;margin:0 0 8px;padding-bottom:5px;border-bottom:1px dashed var(--line-2)}
 
 /* ── 列表 ── */
-.row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--r-sm);cursor:pointer;border:1px solid transparent}
+.row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--r-sm);cursor:pointer;border:1px solid transparent;flex-wrap:wrap;row-gap:4px}
 .row:hover{background:var(--paper-3);border-color:var(--line)}
 .row.on{background:var(--gold-soft);border-color:#e6d7ae}
 .row .nm{font-weight:500}
@@ -135,6 +148,87 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 .field{margin-bottom:12px;text-align:left}
 .field label{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:4px}
 .field input{width:100%}
+
+/* ══════════ 响应式：手机（≤720px） ══════════ */
+@media (max-width:720px){
+  .wrap{padding:0 12px calc(32px + env(safe-area-inset-bottom))}
+  .top{padding-top:calc(8px + env(safe-area-inset-top))}
+
+  /* 顶栏改为两行：品牌 + 按钮，资源条横滑独占一行 */
+  .top-in{gap:8px}
+  .brand{font-size:17px;letter-spacing:1px}
+  .brand .seal{width:26px;height:26px;font-size:15px}
+  /* 资源条整行换行显示，不留横向裁切 */
+  .strip{order:3;width:100%;margin-left:0;gap:8px 14px;flex-wrap:wrap;row-gap:4px}
+  .top-in>div:last-child{margin-left:auto;gap:6px}
+  .lb-full{display:none}
+  .lb-mini{display:inline}
+
+  /* 触摸目标不小于 40px 高 */
+  .btn{padding:9px 14px}
+  .btn.sm{padding:8px 12px}
+  .tab{padding:9px 13px}
+  .tabs{overflow-x:auto;scrollbar-width:none;margin-bottom:12px}
+  .tabs::-webkit-scrollbar{display:none}
+
+  /* 单列：先游戏主体，再案头事件，最后属性面板
+     必须显式 stretch —— 桌面规则里的 align-items:start 会让单列子项收缩成内容宽 */
+  .grid{display:flex;flex-direction:column;gap:12px;margin-top:12px;align-items:stretch}
+  .main{order:1;width:100%}
+  .rail{order:2;width:100%}
+  .side{order:3;width:100%}
+  .card{padding:12px;border-radius:9px;margin-bottom:12px}
+
+  /* 行动卡：消耗另起一行，按钮通栏更好点 */
+  .act{padding:11px}
+  .act-h{flex-wrap:wrap;row-gap:2px}
+  .act-h .cost{margin-left:0;order:2;width:100%}
+  .act .btn.sm{width:100%;text-align:center}
+
+  /* 列表与名册改为整页滚动，不做内嵌滚动区 */
+  .list{max-height:none;overflow:visible}
+  .row{flex-wrap:wrap;row-gap:4px;padding:9px 8px}
+  .row .rt{margin-left:0;width:100%}
+
+  /* 官阶表：压紧到能整表放下，实在放不下才横向滑动 */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tw table{min-width:0}
+  th,td{padding:5px 4px}
+  table{font-size:12px}
+
+  /* 弹层贴底，像原生抽屉 */
+  .mask{padding:0;align-items:flex-end}
+  .modal{width:100%;max-height:90vh;border-radius:14px 14px 0 0}
+  .modal-h{padding:13px 15px}
+  .modal-b{padding:14px 15px}
+  .modal-f{padding:10px 15px calc(12px + env(safe-area-inset-bottom))}
+  .modal-f .btn{padding:10px 16px}
+  .opt{padding:12px}
+
+  /* 提示条贴底通栏，避免遮挡卡片按钮 */
+  .toasts{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));align-items:stretch}
+  .toast{max-width:none}
+
+  .gaz{font-size:12.5px}
+  .splash{padding:16px}
+  .splash .big{font-size:28px;letter-spacing:4px}
+  .splash .sub{font-size:13px;margin-bottom:16px}
+}
+
+/* 超窄屏（≤380px）再收一档字号与内距 */
+@media (max-width:380px){
+  .brand{font-size:15px}
+  .brand .seal{width:22px;height:22px;font-size:13px}
+  .tab{padding:8px 10px;font-size:13px}
+  .btn.sm{padding:7px 10px;font-size:12.5px}
+  .act .act-h{font-size:14px}
+}
+
+/* 手机横放（矮屏）：弹层别占满高度 */
+@media (max-height:520px) and (orientation:landscape){
+  .modal{max-height:94vh}
+  .splash .big{font-size:24px;margin:8px 0 2px}
+}
 </style>
 </head>
 <body>
@@ -144,7 +238,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
     <div class="brand"><span class="seal">衍</span>大衍帝国</div>
     <div class="strip" id="strip"></div>
     <div style="display:flex;gap:8px">
-      <button class="btn primary" id="btn-tick">推 进 一 回 合</button>
+      <button class="btn primary" id="btn-tick"><span class="lb-full">推 进 一 回 合</span><span class="lb-mini">推 进</span></button>
       <button class="btn sm" id="btn-menu">档</button>
     </div>
   </div>
@@ -549,7 +643,10 @@ function toast(msg,kind){
   const el=document.createElement('div');
   el.className='toast'+(kind?' '+kind:'');
   el.textContent=msg;
-  $('toasts').appendChild(el);
+  const box=$('toasts');
+  box.appendChild(el);
+  // 连点推进时别把屏幕堆满提示条
+  while(box.children.length>3) box.removeChild(box.firstChild);
   setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>el.remove(),300); },2600);
 }
 
@@ -996,7 +1093,7 @@ function renderCareer(){
   let h=`<div class="card"><h3>递呈铨选<span class="pill ${ck.ready?'jade':'seal'}">${ck.ready?'可呈':'未达'}</span></h3>
     <div class="fine" style="margin-bottom:10px">${ck.ready?(ck.evict?'缺额已满 —— 呈递之后，将挤走该阶上权势最弱的一名朝臣。':'该阶尚有余缺。'):esc(ck.reason)}</div>
     <button class="btn primary block" id="btn-promo" ${ck.ready?'':'disabled'}>递 呈 铨 选</button></div>`;
-  h+=`<div class="card"><h3>官阶全表<span class="pill">占用 / 员额</span></h3><table><tr><th>品级</th><th>官职</th><th>衙门</th><th class="num">缺</th><th class="num">俸</th></tr>`;
+  h+=`<div class="card"><h3>官阶全表<span class="pill">占用 / 员额</span></h3><div class="tw"><table><tr><th>品级</th><th>官职</th><th>衙门</th><th class="num">缺</th><th class="num">俸</th></tr>`;
   for(let i=MAX_RANK;i>=0;i--){
     const r=RANK[i], ss=slotStats(i);
     const cur=i===me.rank;
@@ -1004,7 +1101,7 @@ function renderCareer(){
       <td>${r.organ==='*'?'中枢六曹':ORGANS[r.organ]}</td>
       <td class="num">${r.slots===null?'不限':ss.filled+'/'+ss.total}</td><td class="num">${r.salary}</td></tr>`;
   }
-  h+=`</table></div>`;
+  h+=`</table></div></div>`;
   return h;
 }
 function bindCareer(){

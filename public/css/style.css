@@ -31,6 +31,10 @@
 
 * { box-sizing: border-box; }
 
+/* 移动端基础：禁止横屏字号自动放大，去掉 300ms 双击缩放延迟 */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+button, input, select, a { touch-action: manipulation; }
+
 html, body {
   margin: 0;
   height: 100%;
@@ -415,16 +419,79 @@ input:focus, select:focus { border-color: var(--seal); box-shadow: 0 0 0 3px var
 .toast.warn { border-left-color: var(--gold); }
 @keyframes slidein { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 
-/* ────────── 窄屏 ────────── */
+/* ────────── 响应式：平板与手机 ────────── */
 
+/* 平板：整页滚动，右栏移到主体下方
+   （早先这里是 .rail{display:none} —— 结果公议聊天与在线名录在窄屏整个消失，
+     而它们正是联机版的核心；改为重排而非隐藏） */
 @media (max-width: 1080px) {
-  .rail { display: none; }
-}
-@media (max-width: 720px) {
+  html, body { height: auto; min-height: 100%; }
+  .app { height: auto; min-height: 100vh; }
   .body { flex-direction: column; }
-  .sidenav { width: 100%; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px; }
+  .sidenav {
+    width: 100%; flex-direction: row; gap: 4px;
+    overflow-x: auto; scrollbar-width: none;
+    border-right: 0; border-bottom: 1px solid var(--line);
+    padding: 8px 10px; position: sticky; top: 0; z-index: 20;
+    padding-top: calc(8px + env(safe-area-inset-top));
+  }
+  .sidenav::-webkit-scrollbar { display: none; }
   .nav { flex-shrink: 0; padding: 8px 14px; }
   .nav-sep { display: none; }
-  .main { padding: 16px 14px 50px; }
-  .stat-strip { gap: 12px; }
+  .main { overflow: visible; padding: 18px 16px 44px; }
+  /* 资源条整行换行显示，不留横向裁切 */
+  .topbar { flex-wrap: wrap; gap: 10px; }
+  .stat-strip { order: 3; width: 100%; flex: none; flex-wrap: wrap; row-gap: 4px; overflow: visible; }
+  .rail { width: 100%; border-left: 0; border-top: 1px solid var(--line); }
+  .rail-block { padding: 14px 16px; }
+  .rail-block:last-child { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  .chat { min-height: 120px; max-height: 44vh; }
+  .threads { max-height: 44vh; }
+}
+
+/* 手机 */
+@media (max-width: 720px) {
+  .topbar { padding: 10px 14px; }
+  .brand { font-size: 15px; }
+  .btn { padding: 9px 14px; }
+  .btn.sm { padding: 7px 12px; }
+  .main { padding: 14px 12px 40px; }
+  .page-title { font-size: 18px; letter-spacing: .12em; }
+  .grid.c2, .grid.c3 { grid-template-columns: 1fr; }
+
+  /* 官阶阶梯：品级与官职换行，不再挤成三列 */
+  .rung { grid-template-columns: 1fr auto; gap: 3px 10px; padding: 9px 11px; }
+  .rung .g { font-size: 12px; }
+  .rung .o { margin-left: 0; }
+
+  .gitem { grid-template-columns: 1fr; gap: 2px; }
+  .people { grid-template-columns: 1fr; }
+  .person { padding: 11px 12px; }
+  .msg { max-width: 88%; }
+  .msgs { max-height: 46vh; }
+
+  /* 弹层贴底，像原生抽屉 */
+  .modal { padding: 0; place-items: end center; }
+  .modal-card { max-width: none; width: 100%; max-height: 90vh; border-radius: 14px 14px 0 0; }
+  .modal-actions { margin-top: 14px; }
+  .modal-actions .btn { padding: 10px 16px; }
+  .picker-list { max-height: 52vh; }
+  .picker-row { padding: 11px 10px; }
+
+  .toasts { right: 12px; left: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); align-items: stretch; }
+  .toast { max-width: none; }
+
+  .gate { padding: 16px; }
+  .gate-card { padding: 26px 20px 22px; }
+  .gate-card h1 { font-size: 23px; letter-spacing: .16em; }
+  .seal { width: 46px; height: 46px; font-size: 24px; }
+}
+
+/* 超窄屏（≤400px） */
+@media (max-width: 400px) {
+  .nav { padding: 8px 11px; font-size: 13px; }
+  .tab { padding: 8px 6px; }
+  .bignum { font-size: 24px; }
+  .act .name { font-size: 14px; }
+  .cost span { padding: 2px 6px; }
 }
