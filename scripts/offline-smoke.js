@@ -66,7 +66,12 @@ console.log('\n▌大衍帝国 · 单机版冒烟测试\n');
 
 /* ── 1. 启动 ── */
 ok(!!$('#splash'), '启动封面已渲染');
-ok($$('#sp-origin option').length === 5, '出身共 5 种', String($$('#sp-origin option').length));
+ok($$('#sp-origins .origin').length === 5, '出身共 5 种', String($$('#sp-origins .origin').length));
+ok($$('#sp-origins .origin.on').length === 1, '出身默认选中一项');
+ok($$('.hero-seal').length === 1 && !!$('.hero-title'), '封面印章与标题已渲染');
+// 换一个出身再开局，确认选择真的生效
+click($$('#sp-origins .origin')[2]);
+ok($$('#sp-origins .origin')[2].classList.contains('on'), '可切换出身');
 
 setVal('#sp-name', '沈砚');
 click($('#sp-start'));

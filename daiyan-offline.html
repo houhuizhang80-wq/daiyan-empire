@@ -141,13 +141,60 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 .kv{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px dashed var(--line)}
 .kv:last-child{border-bottom:none}
 .kv span:last-child{color:var(--ink-2)}
-.splash{position:fixed;inset:0;background:var(--paper);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px}
-.splash-in{width:min(460px,100%);text-align:center}
-.splash .big{font-family:var(--font);font-size:34px;letter-spacing:6px;margin:14px 0 4px}
-.splash .sub{color:var(--ink-3);margin-bottom:22px}
-.field{margin-bottom:12px;text-align:left}
-.field label{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:4px}
-.field input{width:100%}
+/* ── 开局封面 ── */
+.splash{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;
+  padding:28px 20px;overflow-y:auto;
+  background:
+    radial-gradient(1100px 460px at 50% -8%, #fffdf8 0%, transparent 62%),
+    repeating-linear-gradient(0deg, transparent 0 27px, rgba(140,120,90,.045) 27px 28px),
+    var(--paper);
+  animation:fade .3s ease}
+@keyframes fade{from{opacity:0}}
+.splash-in{width:min(520px,100%);animation:rise .42s cubic-bezier(.2,.7,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}}
+
+.hero{text-align:center;margin-bottom:24px}
+.hero-seal{width:52px;height:52px;margin:0 auto 15px;display:grid;place-items:center;
+  background:var(--seal);color:#fff;font-family:var(--font);font-size:27px;border-radius:10px;
+  box-shadow:0 4px 14px rgba(156,43,43,.24)}
+.hero-title{font-family:var(--font);font-size:36px;font-weight:500;letter-spacing:.34em;
+  margin:0 0 12px;text-indent:.34em;color:var(--ink)}
+/* 细分隔线两端缀朱点，替掉一条光秃秃的横线 */
+.hero-rule{position:relative;width:76px;height:1px;margin:0 auto 13px;background:var(--line-2)}
+.hero-rule::before,.hero-rule::after{content:'';position:absolute;top:50%;width:4px;height:4px;
+  border-radius:50%;background:var(--seal);transform:translateY(-50%)}
+.hero-rule::before{left:-10px}
+.hero-rule::after{right:-10px}
+.hero-sub{margin:0;color:var(--ink-3);font-size:12.5px;letter-spacing:.2em}
+
+.startcard{background:var(--paper-2);border:1px solid var(--line);border-radius:16px;
+  padding:24px 24px 18px;box-shadow:var(--shadow-md)}
+
+.field{margin-bottom:17px;text-align:left}
+.field label{display:flex;align-items:baseline;gap:8px;font-size:12.5px;color:var(--ink-2);margin-bottom:7px}
+.field label .hint{font-size:11.5px;color:var(--ink-3);letter-spacing:0}
+.field input{width:100%;padding:11px 13px;font-size:15px}
+
+/* 出身卡：把五个选项的差别直接摆出来，不用猜 */
+.origins{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.origin{position:relative;border:1px solid var(--line-2);border-radius:10px;padding:10px 12px;
+  cursor:pointer;background:var(--paper-2);transition:.16s}
+.origin:hover{border-color:var(--gold);background:var(--gold-soft)}
+.origin.on{border-color:var(--seal);background:var(--seal-soft);box-shadow:inset 3px 0 0 var(--seal)}
+/* 选中角标：光靠底色深浅不够明确 */
+.origin.on::after{content:'';position:absolute;top:9px;right:9px;width:6px;height:6px;
+  border-radius:50%;background:var(--seal)}
+.origin.on .nm{color:var(--seal)}
+.origin .nm{font-family:var(--font);font-size:14px;font-weight:600;letter-spacing:.06em}
+.origin .ds{font-size:11.5px;color:var(--ink-3);line-height:1.5;margin-top:3px}
+.origin .st{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.origin .st i{font-style:normal;font-size:11px;padding:1px 7px;border-radius:20px;
+  background:var(--paper-3);color:var(--ink-2);border:1px solid var(--line)}
+.origin.on .st i{background:#fff;border-color:#e6c9c6;color:var(--seal)}
+
+.btn.lg{padding:13px;font-size:15px;letter-spacing:.22em}
+.splash .fine{margin:14px 0 0;text-align:center}
+#sp-continue{margin-bottom:9px;letter-spacing:.14em}
 
 /* ══════════ 响应式：手机（≤720px） ══════════ */
 @media (max-width:720px){
@@ -210,9 +257,22 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
   .toast{max-width:none}
 
   .gaz{font-size:12.5px}
-  .splash{padding:16px}
-  .splash .big{font-size:28px;letter-spacing:4px}
-  .splash .sub{font-size:13px;margin-bottom:16px}
+
+  /* 封面：手机上收字号、出身改单列 */
+  .splash{padding:16px 14px}
+  .hero{margin-bottom:15px}
+  .hero-seal{width:42px;height:42px;font-size:22px;margin-bottom:10px}
+  .hero-title{font-size:27px;letter-spacing:.24em;text-indent:.24em;margin-bottom:10px}
+  .hero-sub{font-size:12px;letter-spacing:.14em}
+  .startcard{padding:16px 15px 12px;border-radius:14px}
+  .field{margin-bottom:14px}
+  .btn.lg{padding:12px}
+  /* 出身卡两列、藏起氛围描述 —— 否则封面高到要滚动才能看到「释褐入仕」 */
+  .origins{grid-template-columns:1fr 1fr;gap:7px}
+  .origin{padding:9px 10px}
+  .origin .ds{display:none}
+  .origin:last-child{grid-column:1/-1}
+  .origin .st{margin-top:6px}
 }
 
 /* 超窄屏（≤380px）再收一档字号与内距 */
@@ -227,7 +287,11 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 /* 手机横放（矮屏）：弹层别占满高度 */
 @media (max-height:520px) and (orientation:landscape){
   .modal{max-height:94vh}
-  .splash .big{font-size:24px;margin:8px 0 2px}
+  .splash{padding:14px 16px}
+  .hero{margin-bottom:12px}
+  .hero-seal{width:38px;height:38px;font-size:20px;margin-bottom:8px}
+  .hero-title{font-size:22px;margin-bottom:8px;letter-spacing:.2em;text-indent:.2em}
+  .origins{grid-template-columns:1fr 1fr 1fr}
 }
 </style>
 </head>
@@ -269,15 +333,29 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 
 <div class="toasts" id="toasts"></div>
 <div class="splash" id="splash"><div class="splash-in">
-  <div class="big">大衍帝国</div>
-  <div class="sub">单机版 · 十八级官阶 · 五十四缺待补</div>
-  <div class="card" style="text-align:left">
-    <div class="field"><label>表字（同僚如何称呼你）</label><input id="sp-name" maxlength="8" placeholder="如：沈砚" /></div>
-    <div class="field"><label>出身</label><select id="sp-origin"></select></div>
-    <div class="field" id="sp-origin-desc" class="fine"></div>
-    <button class="btn primary block" id="sp-start">释 褐 入 仕</button>
-    <div class="fine" style="margin-top:12px">全部人物、官署、事件均为架空虚构，与现实无关。进度自动存在本机浏览器。</div>
+
+  <div class="hero">
+    <div class="hero-seal">衍</div>
+    <h1 class="hero-title">大衍帝国</h1>
+    <div class="hero-rule"></div>
+    <p class="hero-sub">单机版 · 十八级官阶 · 五十四缺待补</p>
   </div>
+
+  <div class="startcard">
+    <div class="field">
+      <label>表字<span class="hint">同僚如何称呼你</span></label>
+      <input id="sp-name" maxlength="8" placeholder="如：沈砚" autocomplete="off" />
+    </div>
+
+    <div class="field">
+      <label>出身<span class="hint">决定起手的资历与人情</span></label>
+      <div class="origins" id="sp-origins"></div>
+    </div>
+
+    <button class="btn primary block lg" id="sp-start">释 褐 入 仕</button>
+    <p class="fine">全部人物、官署、事件均为架空虚构，与现实无关。<br>进度自动存在本机浏览器。</p>
+  </div>
+
 </div></div>
 
 <script>
@@ -1309,18 +1387,37 @@ function startGame(name,origin){
   freshState(name,origin); save(); renderAll(); setupAuto();
   $('splash').classList.add('hidden');
 }
+let ORIGIN_SEL='han';
+
 function boot(){
-  $('sp-origin').innerHTML=ORIGINS.map(o=>`<option value="${o.key}">${o.name} —— ${o.desc}</option>`).join('');
+  // 出身以卡片呈现：起手加成直接标出来，不必靠一行下拉文案去猜
+  $('sp-origins').innerHTML=ORIGINS.map(o=>{
+    const chips=Object.keys(o.st)
+      .map(k=>`<i>${STAT_NAME[k]} ${o.st[k]>0?'+':''}${o.st[k]}</i>`)
+      .concat(`<i>银两 +${o.res.silver}</i>`).join('');
+    const on=o.key===ORIGIN_SEL;
+    return `<div class="origin${on?' on':''}" data-o="${o.key}" role="radio" aria-checked="${on}">
+      <div class="nm">${o.name}</div><div class="ds">${o.desc}</div><div class="st">${chips}</div></div>`;
+  }).join('');
+  [...document.querySelectorAll('#sp-origins .origin')].forEach(el=>el.onclick=()=>{
+    ORIGIN_SEL=el.dataset.o;
+    [...document.querySelectorAll('#sp-origins .origin')].forEach(x=>{
+      const on=x===el;
+      x.classList.toggle('on',on);
+      x.setAttribute('aria-checked',String(on));
+    });
+  });
+
   const has=(()=>{ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } })();
   if(has){
     const b=document.createElement('button');
-    b.className='btn block'; b.style.marginTop='10px'; b.textContent='继 续 上 次 进 度';
+    b.className='btn ghost block'; b.id='sp-continue'; b.textContent='继 续 上 次 进 度';
     b.onclick=()=>{ if(load()){ renderAll(); setupAuto(); $('splash').classList.add('hidden'); } else toast('存档已损坏。','bad'); };
-    $('sp-start').parentNode.insertBefore(b,$('sp-start').nextSibling);
+    $('sp-start').parentNode.insertBefore(b,$('sp-start'));
   }
   $('sp-start').onclick=()=>{
     const n=($('sp-name').value||'').trim()||'沈砚';
-    startGame(n,$('sp-origin').value);
+    startGame(n,ORIGIN_SEL);
   };
   // 首次渲染一份空壳，避免报错
   S=S||freshState('沈砚','han');
