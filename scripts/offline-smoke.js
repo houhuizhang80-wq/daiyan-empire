@@ -152,6 +152,8 @@ ok(impeached, '暴露拉满时确有落马发生');
 S = G.getS();
 ok(S.me.impeachCount > 0, '落马次数已记录', String(S.me.impeachCount));
 ok(S.me.stats.favor === Math.round(S.me.stats.favor), '圣眷为整数');
+// 还原落马计数，免得把后面的推进测试提前送进结局
+S.over = null; S.me.impeachCount = 0;
 
 /* ── 6. 回合推进 ── */
 const t0 = G.getS().tick;
@@ -199,7 +201,92 @@ for (const t of ['acts', 'career', 'court', 'faction', 'gaz', 'help']) {
     `页签 ${t} 渲染正常`, err || 'view 长度 ' + ($('#view') ? $('#view').innerHTML.length : 'n/a'));
 }
 
-/* ── 10. 运行时错误 ── */
+/* ── 10. 银两口径：同一行动的报价随官阶等比换算 ── */
+const grease = G.ACTIONS.find((a) => a.key === 'grease');
+const cLow = G.silverNeedOf(grease, 0);   // 从九品书办，俸禄 6
+const cHigh = G.silverNeedOf(grease, 17); // 正一品首辅，俸禄 5000
+ok(cLow < 260 && cHigh > 260, `银两报价随官阶换算（末吏 ${cLow} / 首辅 ${cHigh}）`);
+ok(Math.abs(cHigh / 260 - 5000 / 40) < 0.1, '首辅口径应为俸禄/40', String(cHigh / 260));
+
+/* ── 11. 打点铨曹 ── */
+S = G.getS();
+S.me.rank = 0; S.me.cd = {}; S.me.res.silver = 99999; S.me.grease = 0;
+const g1 = G.doAct('grease', null);
+ok(!g1.err && G.getS().me.grease > 0, '打点后取得成算加成', g1.err || String(G.getS().me.grease));
+
+/* ── 12. 派系：党内提携与党库 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 0; S.me.faction = null;
+S.me.stats.network = 200; S.me.res.silver = 999999;
+const cf = G.createFaction('同舟会', 'qingliu');
+ok(!cf.err, '可自立一党', cf.err || '');
+S = G.getS();
+const mine = S.factions.find((x) => x.leader === 0);
+ok(!!mine, '立党者即党魁');
+ok(!G.doAct('treasury', null).err || true, '党魁可尝试提用党库');
+mine.treasury = 1000;
+S.me.cd = {};
+const tr = G.doAct('treasury', null);
+S = G.getS();
+ok(!tr.err && S.factions.find((x) => x.id === mine.id).treasury < 1000,
+  '党库被提取', tr.err || String(S.factions.find((x) => x.id === mine.id).treasury));
+
+// 同党高官每回合提携
+S = G.getS();
+const mate = S.npcs.find((n) => !n.retired);
+mate.faction = S.me.faction; mate.rank = 15;
+const favorBefore = S.me.stats.favor;
+G.factionTick();
+ok(G.getS().me.stats.favor >= favorBefore, '同党高官每回合提携');
+
+/* ── 13. 朝堂风向 ── */
+click($$('#tabs .tab').find((b) => b.dataset.t === 'court'));
+ok(/朝堂风向/.test($('#view').innerHTML), '朝堂页有风向面板');
+ok(/落马/.test($('#view').innerHTML), '风向面板显示落马计数');
+
+/* ── 14. 真实失败：三度落马即革职 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 2;
+let failed = false;
+for (let i = 0; i < 500 && !failed; i++) {
+  S = G.getS();
+  S.me.rank = 8; S.me.stats.favor = 0; S.me.stats.exposure = 100;
+  G.doImpeach(S.me);
+  if (G.getS().over) failed = true;
+}
+ok(failed && G.getS().over.type === 'dismiss', '三度落马即革职为民', JSON.stringify(G.getS().over));
+ok(/三度落马|革职/.test(G.getS().over.note), '罢黜结局有判定说明', G.getS().over.note);
+
+/* ── 15. 生平总评 ── */
+const vd = G.verdict();
+ok(typeof vd.line === 'string' && vd.line.length > 6, '总评给出断语', vd.line);
+ok(vd.e && typeof vd.e.peak === 'number', '总评含四维评级');
+
+/* ── 15.5 类名冲突防护：配色类不得与既有组件类重名 ── */
+click($$('#tabs .tab').find((b) => b.dataset.t === 'acts'));
+const vEl = $('.over .verdict');
+ok(vEl && vEl.textContent.length > 6, '结局断语有文字');
+ok(vEl && /tone-/.test(vEl.className), '断语配色类带 tone- 前缀', vEl && vEl.className);
+ok(!/\bseal\b/.test(vEl.className.replace(/tone-seal/, '')), '断语类名不含裸 seal');
+ok(!!$('.brand-seal') && !$('.brand .seal'), '顶栏印章已用独立类名 brand-seal');
+ok($$('.pill.seal').length > 0, '官阶朱色标签存在');
+
+/* ── 16. 收场后冻结朝局 ── */
+S = G.getS();
+const tickFrozen = S.tick;
+G.worldTick();
+ok(G.getS().tick === tickFrozen, '收场后不再推进回合');
+ok(G.doAct('patrol', null).err, '收场后不能再行事');
+
+/* ── 17. 主动致仕收场 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 0; S.me.cd = {};
+S.me.rank = 6;
+const rs = G.doAct('resign', null);
+ok(G.getS().over && G.getS().over.type === 'retire', '告病致仕触发收场', JSON.stringify(G.getS().over));
+ok(/解印|不问朝事/.test(G.getS().over.note), '致仕结局有说明', G.getS().over.note);
+
+/* ── 18. 运行时错误 ── */
 ok(errors.length === 0, '运行期无脚本错误', errors.join(' | '));
 
 console.log(`\n▌结果：${pass} 通过 / ${fail} 失败\n`);

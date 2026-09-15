@@ -49,7 +49,9 @@ input:focus,select:focus{border-color:var(--gold)}
 .top{position:sticky;top:0;z-index:40;background:linear-gradient(var(--paper-2),var(--paper));border-bottom:1px solid var(--line);padding:10px 0}
 .top-in{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:9px;font-family:var(--font);font-size:19px;letter-spacing:2px}
-.seal{width:30px;height:30px;border-radius:6px;background:var(--seal);color:#fff;display:grid;place-items:center;font-family:var(--font);font-size:17px;flex:none}
+/* 顶栏印章。类名刻意不叫 .seal —— 那会连带命中 <span class="pill seal">，
+   把官阶标签撑成 30×30 的方块、文字变白 */
+.brand-seal{width:30px;height:30px;border-radius:6px;background:var(--seal);color:#fff;display:grid;place-items:center;font-family:var(--font);font-size:17px;flex:none}
 .strip{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--ink-2);margin-left:auto}
 .strip b{color:var(--ink);font-weight:500}
 .strip .warn{color:var(--seal)}
@@ -138,6 +140,14 @@ th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
 th{color:var(--ink-3);font-weight:400;font-size:12px}
 td.num{text-align:right;font-variant-numeric:tabular-nums}
 .fine{font-size:12px;color:var(--ink-3);line-height:1.7}
+/* 结局面板。注意配色类必须带 tone- 前缀 —— 直接叫 .seal 会撞上顶栏印章
+   （.seal 有 width:30px;color:#fff），断语会变成白字压红块、根本看不见 */
+.over .verdict{font-family:var(--font);font-size:16px;line-height:1.8;padding:12px 14px;border-radius:10px;
+  color:var(--ink);background:var(--paper-3);border-left:3px solid var(--seal);margin:12px 0 14px}
+.over .verdict.tone-jade{border-left-color:var(--jade);background:var(--jade-soft)}
+.over .verdict.tone-gold{border-left-color:var(--gold);background:var(--gold-soft)}
+.over .verdict.tone-slate{border-left-color:var(--slate);background:var(--slate-soft)}
+.over .sec{font-size:13px;color:var(--ink-3);letter-spacing:.1em;margin:16px 0 6px;font-weight:500}
 .kv{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px dashed var(--line)}
 .kv:last-child{border-bottom:none}
 .kv span:last-child{color:var(--ink-2)}
@@ -204,7 +214,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
   /* 顶栏改为两行：品牌 + 按钮，资源条横滑独占一行 */
   .top-in{gap:8px}
   .brand{font-size:17px;letter-spacing:1px}
-  .brand .seal{width:26px;height:26px;font-size:15px}
+  .brand-seal{width:26px;height:26px;font-size:15px}
   /* 资源条整行换行显示，不留横向裁切 */
   .strip{order:3;width:100%;margin-left:0;gap:8px 14px;flex-wrap:wrap;row-gap:4px}
   .top-in>div:last-child{margin-left:auto;gap:6px}
@@ -278,7 +288,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 /* 超窄屏（≤380px）再收一档字号与内距 */
 @media (max-width:380px){
   .brand{font-size:15px}
-  .brand .seal{width:22px;height:22px;font-size:13px}
+  .brand-seal{width:22px;height:22px;font-size:13px}
   .tab{padding:8px 10px;font-size:13px}
   .btn.sm{padding:7px 10px;font-size:12.5px}
   .act .act-h{font-size:14px}
@@ -299,7 +309,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 
 <div class="top">
   <div class="wrap top-in">
-    <div class="brand"><span class="seal">衍</span>大衍帝国</div>
+    <div class="brand"><span class="brand-seal">衍</span>大衍帝国</div>
     <div class="strip" id="strip"></div>
     <div style="display:flex;gap:8px">
       <button class="btn primary" id="btn-tick"><span class="lb-full">推 进 一 回 合</span><span class="lb-mini">推 进</span></button>
@@ -503,13 +513,29 @@ const ACTIONS = [
    req:(C)=>{ if(!C.t) return '须择一门当户对之家。'; if(rel(C.p.id,C.t.id,'kin')) return '两家已是姻亲。'; return null; },
    run:(C)=>({eff:{network:J(26),renown:J(8)},rel:[[C.t.id,'kin',55]],
      log:`你与 ${C.t.name} 家议定了婚事，六礼齐备。两家的命运被绑在了同一根绳上。`})},
+  {key:'treasury',path:'social',name:'提用党库',desc:'以党魁之尊调用公库银两。账目上过得去，人心上未必。',cost:{},cd:3,
+   req:(C)=>{
+     const f=S.factions.find(x=>x.id===C.p.faction);
+     if(!f) return '你尚无党可提。';
+     if(f.leader!==0) return '党库非你所能动 —— 你并非党魁。';
+     if(f.treasury<200) return '公库不足二百两，提不出什么。';
+     return null; },
+   run:(C)=>{
+     const f=S.factions.find(x=>x.id===C.p.faction);
+     const take=Math.round(f.treasury*0.5);
+     f.treasury-=take;
+     return {eff:{silver:take,renown:-J(9)},log:`你以党魁身份自「${f.name}」公库提银 ${take} 两。同党嘴上不说，心里记着。`}; }},
+
   {key:'confide',path:'social',name:'托付心腹',desc:'把一件要紧的私事交给某人去办。办成了，他就是心腹。',cost:{silver:160,mandate:1},cd:2,target:1,
    req:(C)=>C.t?null:'须择一人。',
    run:(C)=>({eff:{network:J(12),guile:J(6)},rel:[[C.t.id,'confidant',30]],
      log:`你把一件不便见光的事托给了 ${C.t.name}。他没有多问，只是点了点头。`})},
 
-  {key:'resign',path:'career',name:'告病致仕',desc:'自请去职，退归林下。功名人脉恩怨，一并归零。',cost:{},cd:0,
-   run:()=>({reset:1,log:'疏上，准了。你解下印绶，走出衙门时天刚亮。'})},
+  {key:'grease',path:'open',name:'打点铨曹',desc:'给吏部堂官递一份厚礼。不保证升官，但下次铨选多几分成算。',cost:{silver:260},cd:3,
+   run:()=>({grease:0.12,eff:{exposure:J(4,0.5)},log:'帖子递进去了，回话很客气：「你的考语，我看着呢。」'})},
+
+  {key:'resign',path:'career',name:'告病致仕',desc:'自请去职，退归林下。本局就此收场，按生平功过作一次总评。',cost:{},cd:0,
+   run:()=>({retire:1,log:'疏上，准了。你解下印绶，走出衙门时天刚亮。'})},
 ];
 const ACT = {}; ACTIONS.forEach(a=>ACT[a.key]=a);
 const PATHS = {
@@ -589,6 +615,16 @@ function powerOf(p){
   return Math.round(st.merit+st.renown*0.8+st.network*1.2+st.favor*1.5+st.guile*0.9+r.silver/50+p.rank*120);
 }
 function doctrineOf(p){ if(!p.faction) return null; const f=S.factions.find(x=>x.id===p.faction); return f?DOCTRINES[f.doctrine]:null; }
+
+/**
+ * 银两口径：以县令（俸禄 40）为基准 1.0。
+ * 俸禄随官阶涨近千倍，若打点开价固定，同一份礼在末吏是半年俸禄、在首辅则不值一提 ——
+ * 于是低阶暗线被锁死、高阶暗线零成本。换算后「一次打点值几回合俸禄」在各阶大致相同。
+ */
+function silverScale(rankId){ return Math.max(1,RANK[rankId].salary)/40; }
+function sCost(v,rankId){ return Math.max(1,Math.round(v*silverScale(rankId))); }
+/** 某行动当前官阶下的实际银两开销 */
+function silverNeedOf(a,rankId){ return a.cost&&a.cost.silver?sCost(a.cost.silver,rankId):0; }
 
 /** 属性变动：受所属党派宗旨乘数影响（增益类），并统一钳制 */
 function apply(p,eff,mul){
@@ -714,7 +750,8 @@ function migrate(){
   if(!S.me.stats.health) S.me.stats.health=100;
   if(!S.peak) S.peak=S.me.careerPeak||0;
 }
-function gaz(kind,text,priv){ S.gaz.unshift({kind,text,tick:S.tick,priv:!!priv}); if(S.gaz.length>240) S.gaz.length=240; }
+/** mine=1 标记「与我直接相关」，结局的生平大事只取这些，免得被朝臣迁转刷屏 */
+function gaz(kind,text,priv,mine){ S.gaz.unshift({kind,text,tick:S.tick,priv:!!priv,mine:!!mine}); if(S.gaz.length>240) S.gaz.length=240; }
 /* ══════════ 三、玩法核心 ══════════ */
 
 function toast(msg,kind){
@@ -732,20 +769,23 @@ function toast(msg,kind){
 function doAct(key,targetId){
   const a=ACT[key]; if(!a) return {err:'无此行事。'};
   const me=S.me;
+  if(S.over) return {err:'这一局已经收场了。'};
   if(me.retired) return {err:'你已不在朝中。'};
   if((me.cd[key]||0)>S.tick) return {err:'此事宜缓，须待下回合再议。'};
   const t=targetId!=null?byId(targetId):null;
   const C={p:me,st:me.stats,res:me.res,t:t};
   if(a.req){ const e=a.req(C); if(e) return {err:e}; }
   const cost=a.cost||{};
+  const silverNeed=silverNeedOf(a,me.rank);
   if(cost.mandate&&me.res.mandate<cost.mandate) return {err:'政令不足，难以措手。'};
-  if(cost.silver&&me.res.silver<cost.silver) return {err:'银两不足。'};
+  if(silverNeed&&me.res.silver<silverNeed) return {err:`银两不足（需 ${silverNeed} 两）。`};
   const r=a.run(C)||{};
   if(r.guile&&me.stats.guile<r.guile) return {err:'权谋不足，仓促行事只会露出破绽。'};
 
   if(cost.mandate) me.res.mandate-=cost.mandate;
-  if(cost.silver) me.res.silver=Math.max(0,me.res.silver-cost.silver);
+  if(silverNeed) me.res.silver=Math.max(0,me.res.silver-silverNeed);
   if(r.guile) me.stats.guile=Math.max(0,me.stats.guile-r.guile);
+  if(r.grease) me.grease=(me.grease||0)+r.grease;
 
   const changes=apply(me,r.eff||{});
   if(t){ apply(t,r.teff||{}); (r.rel||[]).forEach(([to,type,d])=>{ apRel(me.id,to,type,d); if(type==='protege') apRel(to,me.id,'patron',d); if(type==='patron') apRel(to,me.id,'protege',d); if(type==='kin') apRel(to,me.id,'kin',d); }); }
@@ -756,14 +796,16 @@ function doAct(key,targetId){
     retaliation=npcRetaliate(t,me);
   }
   if(a.path==='shadow') gaz('rumor','【风闻】京师近日颇有异动，然查无实据。');
-  if(r.log) gaz('act',r.log);
-  if(r.reset) resetCareer();
+  if(r.log) gaz('act',r.log,0,1);
 
   let imp=null;
-  if(Math.random()<impeachRisk(me.stats.exposure)) imp=doImpeach(me);
+  if(!r.retire&&Math.random()<impeachRisk(me.stats.exposure)) imp=doImpeach(me);
+  trackPeaks();
+  checkFail();
+  if(r.retire) endGame('retire');
 
   save();
-  return {log:r.log,changes,retaliation,imp};
+  return {log:r.log,changes,retaliation,imp,over:S.over||null};
 }
 
 /** 朝臣反制：你动了他，他若权势足够便反手一击 */
@@ -800,12 +842,15 @@ function doPromote(){
   if(!ck.ready) return {err:ck.reason};
   const next=RANK[me.rank+1], sc=scoreOf(me.stats);
   let p=0.35+((sc-next.cap)/Math.max(next.cap,1))*0.55+me.stats.favor/400+me.stats.renown/900-me.stats.exposure/1400;
+  const grease=me.grease||0;          // 打点铨曹换来的临时成算
+  p+=grease;
   p=clamp(p,0.05,0.95);
   me.cd.__promo=S.tick+CONST.PROMO_CD;
+  me.grease=0;                        // 礼送出去了，用不用得上看这一次
   if(Math.random()>=p){
     apply(me,{favor:-4,renown:-3},RANK_YIELD[me.rank]);
-    gaz('rumor',`${me.name} 铨选 ${next.title} 未果，仍留原任。`);
-    save(); return {ok:false,msg:`铨选未果（成算 ${Math.round(p*100)}%），仍留原任。`};
+    gaz('rumor',`${me.name} 铨选 ${next.title} 未果，仍留原任。`,0,1);
+    save(); return {ok:false,msg:`铨选未果（成算 ${Math.round(p*100)}%）${grease?'，打点的银子白花了':''}，仍留原任。`};
   }
   if(ck.evict){
     const victim=weakestAt(me.rank+1);
@@ -815,9 +860,13 @@ function doPromote(){
   me.rank=next.id; me.tenure=0; me.careerPeak=Math.max(me.careerPeak,me.rank);
   takeSlot(me,me.rank);
   S.peak=Math.max(S.peak||0,me.rank);
-  gaz('promote',`制曰：${me.name} 铨选得中，迁 ${next.grade}${next.title}。`);
+  gaz('promote',`制曰：${me.name} 铨选得中，迁 ${next.grade}${next.title}。`,0,1);
+  if(me.rank>=MAX_RANK&&!S.zenith){
+    S.zenith=true;
+    gaz('system','你已位极人臣 —— 票拟之首。此后可继续经营朝局，也可告病致仕，作一次生平总评。',0,1);
+  }
   save();
-  return {ok:true,msg:`铨选得中（成算 ${Math.round(p*100)}%）。今为 ${next.grade}${next.title}。`};
+  return {ok:true,msg:`铨选得中（成算 ${Math.round(p*100)}%${grease?'，含打点加成':''}）。今为 ${next.grade}${next.title}。`};
 }
 
 /* ── 弹劾 ── */
@@ -830,7 +879,7 @@ function doImpeach(p){
   const survive=Math.random()<clamp(p.stats.favor/(p.stats.favor+scale)+0.18,0.12,0.8);
   if(survive){
     apply(p,{exposure:-55,favor:-35,renown:-10},RANK_YIELD[p.rank]);
-    gaz('impeach',`台谏交章论 ${p.name}，上命「留中再议」。风波暂息。`);
+    gaz('impeach',`台谏交章论 ${p.name}，上命「留中再议」。风波暂息。`,0,p.id===0);
     if(p.id===0) return {survived:1,msg:'弹章盈尺，然圣眷未衰。你安然过关，只是元气大伤。'};
     return {survived:1};
   }
@@ -840,13 +889,14 @@ function doImpeach(p){
   p.stats.exposure=45; p.stats.favor=Math.round(p.stats.favor*0.4);
   if(p.id===0){ p.careerPeak=Math.max(p.careerPeak,p.rank); p.impeachCount++; }
   if(p.rank>=CONST.CONTESTED_FROM) takeSlot(p,p.rank);
-  gaz('impeach',`制曰：${p.name} 坐事镌级，降 ${RANK[p.rank].grade}${RANK[p.rank].title}。`);
+  gaz('impeach',`制曰：${p.name} 坐事镌级，降 ${RANK[p.rank].grade}${RANK[p.rank].title}。`,0,p.id===0);
   if(p.id===0){
     // 连坐：姻亲与心腹
     let n=0;
     S.rels.filter(r=>r.from===0&&r.type==='kin').forEach(r=>{ const k=byId(r.to); if(k&&!k.retired){ apply(k,{favor:-14,renown:-6},RANK_YIELD[k.rank]); apRel(0,k.id,'kin',-10); n++; } });
     S.rels.filter(r=>r.to===0&&r.type==='confidant').forEach(r=>{ const k=byId(r.from); if(k&&!k.retired){ apply(k,{favor:-6,network:-5}); n++; } });
-    if(n) gaz('impeach',`${p.name} 既败，姻党与门下皆受波及，朝中一时人人自危。`);
+    if(n) gaz('impeach',`${p.name} 既败，姻党与门下皆受波及，朝中一时人人自危。`,0,1);
+    checkFail();
     return {survived:0,msg:`弹章入，上震怒。你从 ${old.grade}${old.title} 上被拽了下来。`+(n?`（${n} 家受牵连）`:'')};
   }
   return {survived:0};
@@ -858,6 +908,7 @@ function retire(p,note){
 
 /* ── 回合推进 ── */
 function worldTick(){
+  if(S.over) return S.tick;   // 已经收场，朝局不再推进
   S.tick++;
   const me=S.me, r=RANK[me.rank];
   me.res.silver+=r.salary;
@@ -871,11 +922,14 @@ function worldTick(){
 
   npcTick();
   npcSocial();
+  factionTick();
   S.factions.forEach(f=>{
     const mem=[...S.npcs.filter(n=>n.faction===f.id&&!n.retired),...(me.faction===f.id?[me]:[])];
     f.power=mem.reduce((a,m)=>a+powerOf(m),0);
   });
   replenish();
+  trackPeaks();
+  checkFail();
   save();
   return S.tick;
 }
@@ -915,13 +969,21 @@ function npcSocial(){
   const hasBond=S.rels.some(r=>(r.from===n.id&&r.to===0)&&['patron','protege','ally','confidant'].includes(r.type));
   const hasGrudge=S.rels.some(r=>(r.from===n.id&&r.to===0)&&['rival','nemesis'].includes(r.type));
   const dark=d&&d.m.guile>=1.2;
+  const sameFaction=!!(me.faction&&n.faction===me.faction);
+  // 同党是实在的护身符：不构陷你，还替你在堂上说话
+  if(sameFaction&&!hasGrudge){
+    apply(me,{favor:J(8)*k,network:J(8)*k});
+    apRel(n.id,me.id,'ally',14); apRel(me.id,n.id,'ally',14);
+    const txt=`${n.name} 与你同党，在堂上替你递了一句话。`;
+    gaz('social',txt); return txt;
+  }
   if(hasBond&&!(dark&&Math.random()<0.2)){
     apply(me,{favor:J(9)*k,renown:J(5)*k});
     apRel(n.id,me.id,'patron',20); apRel(me.id,n.id,'protege',20);
     const txt=`${n.name} 在御前替你说了话。自此他以你为门生。`;
     gaz('social',txt); return txt;
   }
-  if(hasGrudge||(dark&&Math.random()<0.5)){
+  if(!sameFaction&&(hasGrudge||(dark&&Math.random()<0.5))){
     const hit=powerOf(n)>powerOf(me)*rnd(0.6,1.2);
     if(hit){
       apply(me,{merit:-J(12)*k,favor:-J(6)*k,exposure:J(5,0.4)});
@@ -939,6 +1001,20 @@ function npcSocial(){
     return `${n.name} 有意招揽。`;
   }
   return null;
+}
+
+/** 党内提携：党中有人比你高，才会替你说话；党势越厚，话越管用 */
+function factionTick(){
+  const me=S.me; if(!me.faction||S.over) return;
+  const f=S.factions.find(x=>x.id===me.faction); if(!f) return;
+  const mates=S.npcs.filter(n=>n.faction===f.id&&!n.retired);
+  if(!mates.length) return;
+  const top=mates.reduce((a,b)=>b.rank>a.rank?b:a);
+  if(top.rank<=me.rank) return;
+  const k=RANK_YIELD[me.rank];
+  const w=Math.min(1.5,0.6+(f.power/Math.max(1,powerOf(me)))*0.4);
+  apply(me,{favor:Math.round(2*k*w),network:Math.round(3*k*w)});
+  if(S.tick%8===0) gaz('faction',`${top.name}（${RANK[top.rank].title}）在堂上替「${f.name}」说了话，你也沾了光。`,0,1);
 }
 
 /** 空缺过多时补新血 */
@@ -969,13 +1045,19 @@ function spawnEvent(){
 function resolveEvent(i,oi){
   const ev=S.pending[i]; if(!ev) return {err:'无此事件。'};
   const o=ev.opts[oi]; const me=S.me;
+  if(S.over) return {err:'这一局已经收场了。'};
+  const sc=silverScale(me.rank);
+  const need=o.cost.silver?Math.round(o.cost.silver*sc):0;
   if(o.cost.mandate&&me.res.mandate<o.cost.mandate) return {err:'政令不足。'};
-  if(o.cost.silver&&me.res.silver<o.cost.silver) return {err:'银两不足。'};
+  if(need&&me.res.silver<need) return {err:`银两不足（需 ${need} 两）。`};
   if(o.cost.mandate) me.res.mandate-=o.cost.mandate;
-  if(o.cost.silver) me.res.silver=Math.max(0,me.res.silver-o.cost.silver);
-  const ch=apply(me,o.eff);
+  if(need) me.res.silver=Math.max(0,me.res.silver-need);
+  // 事件的银两收支同按官阶口径换算，否则厚礼在高阶不值一提、在末吏则是一笔巨款
+  const eff={...o.eff};
+  if(eff.silver) eff.silver=Math.round(eff.silver*sc);
+  const ch=apply(me,eff);
   S.pending.splice(i,1);
-  gaz('event',`【${ev.title}】你选择了「${o.label}」。`);
+  gaz('event',`【${ev.title}】你选择了「${o.label}」。`,0,1);
   if(Math.random()<impeachRisk(me.stats.exposure)){ const im=doImpeach(me); save(); return {ch,imp:im}; }
   save();
   return {ch};
@@ -993,20 +1075,20 @@ function createFaction(name,doc){
   const id=Math.max(0,...S.factions.map(f=>f.id))+1;
   S.factions.push({id,name,doctrine:doc,motto:DOCTRINES[doc].desc,leader:0,treasury:0,power:0});
   me.faction=id;
-  gaz('faction',`${me.name} 立「${name}」一党，宗旨${DOCTRINES[doc].name}。`);
+  gaz('faction',`${me.name} 立「${name}」一党，宗旨${DOCTRINES[doc].name}。`,0,1);
   save(); return {ok:1};
 }
 function joinFaction(id){
   const me=S.me; if(me.faction) return {err:'你已在党中。'};
   const f=S.factions.find(x=>x.id===id); if(!f) return {err:'并无此党。'};
-  me.faction=id; gaz('faction',`${me.name} 入「${f.name}」。`); save(); return {ok:1};
+  me.faction=id; gaz('faction',`${me.name} 入「${f.name}」。`,0,1); save(); return {ok:1};
 }
 function leaveFaction(){
   const me=S.me; if(!me.faction) return {err:'你本无党。'};
   const f=S.factions.find(x=>x.id===me.faction);
   me.faction=null; apply(me,{network:-12,renown:-8});
   if(f&&f.leader===0) f.leader=null;
-  gaz('faction',`${me.name} 退出「${f?f.name:'某党'}」，清议侧目。`);
+  gaz('faction',`${me.name} 退出「${f?f.name:'某党'}」，清议侧目。`,0,1);
   save(); return {ok:1};
 }
 function donate(amount){
@@ -1015,19 +1097,75 @@ function donate(amount){
   const v=Math.min(amount,me.res.silver);
   if(v<=0) return {err:'囊中无银。'};
   me.res.silver-=v; f.treasury+=v; me.res.influence+=Math.round(v/50);
-  gaz('faction',`${me.name} 输银 ${v} 两入「${f.name}」公库。`);
+  gaz('faction',`${me.name} 输银 ${v} 两入「${f.name}」公库。`,0,1);
   save(); return {ok:1,v};
 }
 
-/* ── 致仕重开 ── */
-function resetCareer(){
+/* ══════════ 终局：三种收场与生平总评 ══════════ */
+
+const END_META={
+  retire:{title:'致仕归里',cls:'gold',note:'解印而去，从此不问朝事。'},
+  dismiss:{title:'罢黜为民',cls:'seal',note:'三度落马，物议沸腾。有旨：永不叙用。'},
+  peak:{title:'位极人臣',cls:'jade',note:'已登首辅，票拟之首。'},
+};
+
+function endGame(type,note){
+  if(S.over) return S.over;
+  S.over={type,note:note||(END_META[type]||{}).note||'',tick:S.tick};
+  gaz('end',`【${(END_META[type]||{}).title||'收场'}】${S.over.note}`,0,1);
+  save();
+  return S.over;
+}
+
+/** 生平总评：四个维度各给一档，再合成一句断语 */
+function evaluate(){
   const me=S.me;
-  releaseSlots(0);
-  me.rank=0; me.organ='county'; me.tenure=0; me.stats=blankStats();
-  me.res={silver:CONST.START_SILVER,mandate:RANK[0].mandate,influence:0};
-  me.cd={}; me.faction=null;
-  S.rels=S.rels.filter(r=>r.from!==0&&r.to!==0);
-  gaz('system',`${me.name} 致仕归里，重头再来。`);
+  const peak=Math.max(S.peak||0,me.rank);
+  const clean=(me.peakRenown||0)-(me.impeachCount||0)*10;
+  const wealth=me.peakSilver||0;
+  const ties=S.rels.filter(r=>r.from===0&&['protege','ally','confidant','patron','kin'].includes(r.type)).length;
+  const hasFaction=me.faction?1:0;
+  const lv=(v,a,b,c)=>v>=a?3:v>=b?2:v>=c?1:0;
+  return {
+    peak, clean, wealth, ties, hasFaction,
+    rank:lv(peak,15,10,5),
+    fame:lv(clean,600,260,60),
+    gold:lv(wealth,40000,12000,3000),
+    bond:lv(ties+hasFaction,8,5,2),
+  };
+}
+function verdict(){
+  const e=evaluate();
+  const total=e.rank*2+e.fame+e.gold*0.5+e.bond*0.5;
+  let line,tone;
+  // 收场方式优先于生平功过：被罢黜的人不该得到一句「进退有据」的评语
+  if(S.over&&S.over.type==='dismiss'){
+    if(e.gold>=3) return {e,line:'宦囊甚厚而晚节不保。罢黜之日，家产亦入官。',tone:'seal'};
+    if(e.rank>=2) return {e,line:'曾历通显，卒以物议去位。仕途之险，于此可见。',tone:'seal'};
+    return {e,line:'晚节不保，一败涂地。三度落马，从此不复起用。',tone:'seal'};
+  }
+  if(e.rank>=3&&e.fame>=2){ line='位极人臣而清名不坠，本朝数十年仅此一人。'; tone='jade'; }
+  else if(e.rank>=3&&e.fame<=0){ line='权势倾天下，然身后清议汹汹，子孙不敢言其事。'; tone='seal'; }
+  else if(e.rank>=2&&e.fame>=1){ line='历事三朝，进退有据，士林以为得体。'; tone='gold'; }
+  else if(e.gold>=3&&e.rank<=1){ line='官未显而家资巨万，时人窃议其所以致此。'; tone='seal'; }
+  else if(total>=6){ line='虽未至公卿，然一生无大过，可谓善终。'; tone='jade'; }
+  else if(e.rank<=0&&e.fame<=0){ line='碌碌州县，泯然众人，史册不载其名。'; tone='slate'; }
+  else { line='宦海浮沉，功过各半，唯自知之。'; tone='gold'; }
+  return {e,line,tone};
+}
+
+/** 落马满三次即革职 —— 暗线从此有终极代价，不再是无限次降级 */
+function checkFail(){
+  if(S.over) return;
+  if((S.me.impeachCount||0)>=3) endGame('dismiss','三度落马，物议沸腾。有旨：革职为民，永不叙用。');
+}
+
+/** 记录生平峰值，供结局总评使用 */
+function trackPeaks(){
+  const me=S.me;
+  S.peak=Math.max(S.peak||0,me.rank);
+  me.peakRenown=Math.max(me.peakRenown||0,me.stats.renown);
+  me.peakSilver=Math.max(me.peakSilver||0,me.res.silver);
 }
 /* ══════════ 四、界面 ══════════ */
 
@@ -1056,13 +1194,17 @@ function fmtChanges(ch){
 
 function renderAll(){
   const me=S.me, r=RANK[me.rank];
+  const cnt=me.impeachCount||0;
   $('strip').innerHTML=
     `<span>第 <b>${S.tick}</b> 回合</span>`+
     `<span><b>${me.name}</b> · ${r.grade}${r.title}</span>`+
     `<span>${ORGANS[me.organ]||'—'}</span>`+
     `<span>银 <b>${me.res.silver}</b></span>`+
     `<span>政令 <b>${me.res.mandate}</b>/${r.mandate}</span>`+
-    (me.faction?`<span class="pill gold">${esc((S.factions.find(f=>f.id===me.faction)||{}).name||'')}</span>`:'');
+    (cnt?`<span class="${cnt>=2?'warn':''}">被劾 <b>${cnt}</b>/3</span>`:'')+
+    (me.faction?`<span class="pill gold">${esc((S.factions.find(f=>f.id===me.faction)||{}).name||'')}</span>`:'')+
+    (S.over?`<span class="pill seal">已收场</span>`:'');
+  $('btn-tick').disabled=!!S.over;
 
   $('card-me').innerHTML=`<h3>${esc(me.name)}<span class="pill seal">${r.grade}${r.title}</span></h3>
     <div class="kv"><span>衙门</span><span>${ORGANS[me.organ]||'—'}</span></div>
@@ -1090,6 +1232,8 @@ function renderAll(){
 
 function renderView(){
   const v=$('view');
+  // 收场之后，除了翻邸报，其余页签一律让位给结局面板
+  if(S.over&&TAB!=='gaz'){ v.innerHTML=renderOver(); bindOver(); return; }
   if(TAB==='acts') v.innerHTML=renderActs();
   else if(TAB==='career') v.innerHTML=renderCareer();
   else if(TAB==='court') v.innerHTML=renderCourt();
@@ -1100,6 +1244,35 @@ function renderView(){
   if(TAB==='career') bindCareer();
   if(TAB==='court') bindCourt();
   if(TAB==='faction') bindFaction();
+}
+
+/* ── 终局结算 ── */
+function renderOver(){
+  const meta=END_META[S.over.type]||{title:'收场',cls:'slate'};
+  const {e,line,tone}=verdict();
+  // 只取「与我相关」的条目 —— 否则会被满屏「邸报：某某迁某职」淹没
+  const milestones=S.gaz.filter(g=>g.mine).slice(0,14);
+  return `<div class="card over">
+    <h3>${meta.title}<span class="pill ${meta.cls}">第 ${S.tick} 回合</span></h3>
+    <div class="fine">${esc(S.over.note||'')}</div>
+    <div class="verdict tone-${tone}">${esc(line)}</div>
+    <div class="kv"><span>官阶巅峰</span><span>${RANK[e.peak].grade}${RANK[e.peak].title}</span></div>
+    <div class="kv"><span>被劾次数</span><span>${S.me.impeachCount||0} 次</span></div>
+    <div class="kv"><span>清名（声望峰值）</span><span>${Math.round(e.clean)}</span></div>
+    <div class="kv"><span>家资峰值</span><span>${e.wealth} 两</span></div>
+    <div class="kv"><span>门下与姻亲</span><span>${e.ties} 人${S.me.faction?' · 在党':''}</span></div>
+    <h4 class="sec">生平大事</h4>
+    ${milestones.map(g=>`<div class="gaz"><span class="t">${g.tick}</span>${esc(g.text)}</div>`).join('')||'<div class="fine">史册无载。</div>'}
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn primary" id="ov-new">重开一局</button>
+      <button class="btn" id="ov-gaz">翻看完整邸报</button>
+    </div>
+  </div>`;
+}
+function bindOver(){
+  const a=$('ov-new'), b=$('ov-gaz');
+  if(a) a.onclick=()=>{ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} location.reload(); };
+  if(b) b.onclick=()=>{ TAB='gaz'; renderAll(); };
 }
 
 /* ── 施政 ── */
@@ -1113,7 +1286,7 @@ function renderActs(){
       const cd=(me.cd[a.key]||0)>S.tick;
       const cost=[];
       if(a.cost.mandate) cost.push('政令 '+a.cost.mandate);
-      if(a.cost.silver) cost.push('银 '+a.cost.silver);
+      if(a.cost.silver) cost.push('银 '+silverNeedOf(a,me.rank));
       if(a.key==='scheme') cost.push('权谋 '+Math.round(14*RANK_YIELD[me.rank]));
       h+=`<div class="act"><div class="act-h">${a.name}<span class="cost">${cost.join(' · ')||'—'}</span></div>
         <div class="act-d">${a.desc}</div>
@@ -1170,7 +1343,9 @@ function renderCareer(){
   const me=S.me, ck=readiness();
   let h=`<div class="card"><h3>递呈铨选<span class="pill ${ck.ready?'jade':'seal'}">${ck.ready?'可呈':'未达'}</span></h3>
     <div class="fine" style="margin-bottom:10px">${ck.ready?(ck.evict?'缺额已满 —— 呈递之后，将挤走该阶上权势最弱的一名朝臣。':'该阶尚有余缺。'):esc(ck.reason)}</div>
-    <button class="btn primary block" id="btn-promo" ${ck.ready?'':'disabled'}>递 呈 铨 选</button></div>`;
+    <div class="kv"><span>打点加成</span><span>${me.grease?`+${Math.round(me.grease*100)}%（本次铨选）`:'无 —— 可去「打点铨曹」'}</span></div>
+    ${me.rank>=MAX_RANK?'<div class="fine" style="margin-top:8px">你已位极人臣。若想收场，可「告病致仕」作一次生平总评。</div>':''}
+    <button class="btn primary block" id="btn-promo" style="margin-top:10px" ${ck.ready?'':'disabled'}>递 呈 铨 选</button></div>`;
   h+=`<div class="card"><h3>官阶全表<span class="pill">占用 / 员额</span></h3><div class="tw"><table><tr><th>品级</th><th>官职</th><th>衙门</th><th class="num">缺</th><th class="num">俸</th></tr>`;
   for(let i=MAX_RANK;i>=0;i--){
     const r=RANK[i], ss=slotStats(i);
@@ -1192,11 +1367,41 @@ function bindCareer(){
 }
 
 /* ── 朝堂 ── */
+/** 朝堂风向：把「谁盯着你」从暗处搬到台面上 —— 看不见的威胁无法被应对 */
+function renderWind(){
+  const me=S.me;
+  const pick=(types)=>{ const set=new Set(types); return S.rels
+    .filter(r=>r.from!==0&&r.to===0&&set.has(r.type))
+    .map(r=>byId(r.from)).filter(p=>p&&!p.retired)
+    .sort((a,b)=>powerOf(b)-powerOf(a)); };
+  const foes=pick(['rival','nemesis']);
+  const friends=pick(['ally','patron','protege','confidant','kin']);
+  const f=me.faction?S.factions.find(x=>x.id===me.faction):null;
+  const mates=f?S.npcs.filter(n=>n.faction===f.id&&!n.retired):[];
+  const danger=foes.filter(p=>powerOf(p)>=powerOf(me)*0.7);
+  const cnt=me.impeachCount||0;
+  let h=`<div class="card"><h3>朝堂风向<span class="pill ${danger.length?'seal':'jade'}">${
+    danger.length?`有 ${danger.length} 人可能对你出手`:'暂时无人相逼'}</span></h3>`;
+  h+=`<div class="kv"><span>痕迹</span><span>${me.stats.exposure>=CONST.IMPEACH_WARN
+    ?`已越线 —— 每次行事后 ${Math.round(impeachRisk(me.stats.exposure)*100)}% 遭劾`
+    :`未越线（${Math.round(me.stats.exposure)}/${CONST.IMPEACH_WARN}）`}</span></div>`;
+  h+=`<div class="kv"><span>落马</span><span>${cnt} / 3 次${cnt>=2?' —— 再有一次便革职为民':''}</span></div>`;
+  if(f) h+=`<div class="kv"><span>本党</span><span>${esc(f.name)} · 党员 ${mates.length} 人 · 公库 ${f.treasury} 两${
+    f.leader===0?'（你是党魁）':''}</span></div>`;
+  if(foes.length) h+=`<div class="fine" style="margin-top:9px">结怨：`+
+    foes.slice(0,6).map(p=>`<span class="pill ${powerOf(p)>=powerOf(me)*0.7?'seal':''}">${esc(p.name)} ${RANK[p.rank].title}</span>`).join(' ')+`</div>`;
+  if(friends.length) h+=`<div class="fine" style="margin-top:6px">交好：`+
+    friends.slice(0,6).map(p=>`<span class="pill jade">${esc(p.name)}</span>`).join(' ')+`</div>`;
+  h+=`</div>`;
+  return h;
+}
+
 function renderCourt(){
   const me=S.me;
   const live=S.npcs.filter(n=>!n.retired).sort((a,b)=>b.rank-a.rank);
   const free=S.slots.filter(s=>s.holder===null).length;
-  let h=`<div class="card"><h3>朝堂<span class="pill">在朝 ${live.length} 员 · 空 ${free} 缺</span></h3>
+  let h=renderWind();
+  h+=`<div class="card"><h3>朝堂<span class="pill">在朝 ${live.length} 员 · 空 ${free} 缺</span></h3>
     <div class="fine" style="margin-bottom:8px">点一名朝臣可查看详情并行事；名录按官阶排序。</div>
     <div class="list">`+live.map(n=>{
       const rt=[];
@@ -1311,8 +1516,10 @@ function renderEvent(){
   box.innerHTML=`<h3>${esc(ev.title)}<span class="pill seal">待决 ${S.pending.length}</span></h3>
     <div class="fine" style="margin-bottom:8px">${esc(ev.text)}</div>`+
     ev.opts.map((o,i)=>{
-      const lack=(o.cost.mandate&&me.res.mandate<o.cost.mandate)||(o.cost.silver&&me.res.silver<o.cost.silver);
-      const c=[]; if(o.cost.mandate) c.push('政令 '+o.cost.mandate); if(o.cost.silver) c.push('银 '+o.cost.silver);
+      const sc=silverScale(me.rank);
+      const need=o.cost.silver?Math.round(o.cost.silver*sc):0;
+      const lack=(o.cost.mandate&&me.res.mandate<o.cost.mandate)||(need&&me.res.silver<need);
+      const c=[]; if(o.cost.mandate) c.push('政令 '+o.cost.mandate); if(need) c.push('银 '+need);
       return `<div class="opt ${lack?'dis':''}" data-ev="${i}"><div class="l">${o.label}</div>
         <div class="d">${esc(o.desc)}</div><div class="c">${c.join(' · ')||'无耗费'}</div></div>`;
     }).join('');
@@ -1426,7 +1633,8 @@ function boot(){
 boot();
 
 window.__G={getS:()=>S,setS:(o)=>{S=o},doAct,doPromote,doImpeach,worldTick,resolveEvent,readiness,
-  scoreOf,powerOf,impeachRisk,freshState,save,load,startGame,ACTIONS,RANKS,EVENTS,slotStats,RANK_YIELD};
+  scoreOf,powerOf,impeachRisk,freshState,save,load,startGame,ACTIONS,RANKS,EVENTS,slotStats,RANK_YIELD,
+  silverNeedOf,silverScale,verdict,evaluate,endGame,factionTick,createFaction,joinFaction,leaveFaction,donate,trackPeaks};
 })();
 </script>
 </body>
