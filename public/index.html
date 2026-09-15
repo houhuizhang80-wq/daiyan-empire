@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>大衍帝国 · 权谋经营</title>
+<link rel="stylesheet" href="/css/style.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>印</text></svg>" />
+</head>
+<body>
+
+<!-- ══════════ 登录 ══════════ -->
+<div id="gate" class="gate">
+  <div class="gate-card">
+    <div class="seal">衍</div>
+    <h1>大衍帝国</h1>
+    <p class="sub">九州三十六郡 · 十八级官阶 · 五十四缺待补</p>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="login">投帖</button>
+      <button class="tab" data-tab="register">释褐</button>
+    </div>
+
+    <form id="form-login" class="pane active">
+      <label>名号<input name="username" autocomplete="username" placeholder="英文或数字，3-20 位" required /></label>
+      <label>口令<input name="password" type="password" autocomplete="current-password" placeholder="至少 6 位" required /></label>
+      <button class="btn primary" type="submit">入 朝</button>
+    </form>
+
+    <form id="form-register" class="pane">
+      <label>名号<input name="username" autocomplete="username" placeholder="英文或数字，3-20 位" required /></label>
+      <label>表字<input name="displayName" placeholder="同僚如何称呼你，如「沈砚」" maxlength="12" required /></label>
+      <label>口令<input name="password" type="password" autocomplete="new-password" placeholder="至少 6 位" required /></label>
+      <button class="btn primary" type="submit">释褐入仕</button>
+    </form>
+
+    <div id="gate-msg" class="gate-msg"></div>
+    <p class="fineprint">本作背景、王朝、官署、官阶均为架空虚构，与现实任何机构无关。</p>
+  </div>
+</div>
+
+<!-- ══════════ 主界面 ══════════ -->
+<div id="app" class="app hidden">
+
+  <header class="topbar">
+    <div class="brand"><span class="seal sm">衍</span><b>大衍帝国</b></div>
+
+    <div class="stat-strip" id="stat-strip"></div>
+
+    <div class="topbar-right">
+      <span class="tick-badge" id="tick-badge">第 0 回合</span>
+      <button class="btn ghost sm" id="btn-logout">去 位</button>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <!-- 左导航 -->
+    <nav class="sidenav" id="sidenav">
+      <button class="nav active" data-view="court">朝 堂</button>
+      <button class="nav" data-view="acts">施 政</button>
+      <button class="nav" data-view="career">仕 途</button>
+      <button class="nav" data-view="relations">人 脉</button>
+      <button class="nav" data-view="factions">党 派</button>
+      <button class="nav" data-view="inbox">私 函</button>
+      <button class="nav" data-view="gazette">邸 报</button>
+      <button class="nav" data-view="roster">名 录</button>
+      <div class="nav-sep"></div>
+      <button class="nav" data-view="help">凡 例</button>
+    </nav>
+
+    <!-- 主区 -->
+    <main class="main" id="main"></main>
+
+    <!-- 右栏 -->
+    <aside class="rail">
+      <section class="rail-block">
+        <h3>在朝同僚 <span class="pill" id="online-count">0</span></h3>
+        <div class="roster" id="roster"></div>
+      </section>
+      <section class="rail-block grow">
+        <h3>
+          <span>朝堂公议</span>
+          <span class="chan-switch">
+            <button class="ch active" data-ch="global" type="button">公议</button>
+            <button class="ch" data-ch="faction" type="button">党内</button>
+          </span>
+        </h3>
+        <div class="chat" id="chat"></div>
+        <form class="chat-input" id="chat-form">
+          <input id="chat-text" placeholder="当众说一句…" maxlength="300" autocomplete="off" />
+          <button class="btn sm" type="submit">发</button>
+        </form>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<!-- 弹窗与提示条由 app.js 动态挂载 -->
+
+<!-- ══════════ 提示条 ══════════ -->
+<div id="toasts" class="toasts"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

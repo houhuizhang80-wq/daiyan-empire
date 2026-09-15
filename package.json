@@ -1,0 +1,33 @@
+{
+  "name": "daiyan-empire",
+  "version": "1.0.0",
+  "description": "《大衍帝国》——架空王朝多人在线权谋经营模拟器",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "smoke": "node scripts/smoke.js",
+    "test:promote": "node scripts/promote-test.js",
+    "test:npc": "node scripts/npc-test.js",
+    "test:ui": "node scripts/ui-smoke.js",
+    "test": "node scripts/promote-test.js && node scripts/npc-test.js && node scripts/smoke.js && node scripts/ui-smoke.js",
+    "sim": "node scripts/sim.js",
+    "reset": "node scripts/reset.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.7.0",
+    "compression": "^1.7.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.8.1"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "jsdom": "^30.0.1"
+  }
+}

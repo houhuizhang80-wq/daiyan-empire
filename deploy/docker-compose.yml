@@ -1,0 +1,28 @@
+services:
+  daiyan:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: daiyan-empire:1.0.0
+    container_name: daiyan
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      PORT: 8787
+      HOST: 0.0.0.0
+      DB_PATH: /data/empire.db
+      TICK_MS: 180000
+      # 多实例或需要固定会话时设置：
+      # JWT_SECRET: "换成你自己的随机长串"
+    volumes:
+      - daiyan-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 4s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  daiyan-data:

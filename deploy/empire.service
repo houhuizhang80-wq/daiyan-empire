@@ -1,0 +1,34 @@
+; systemd 单元文件
+; 部署：
+;   sudo cp deploy/empire.service /etc/systemd/system/daiyan.service
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now daiyan
+;   journalctl -u daiyan -f
+
+[Unit]
+Description=Daiyan Empire (multiplayer text strategy server)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/daiyan
+ExecStart=/usr/bin/node server/index.js
+Environment=NODE_ENV=production
+Environment=PORT=8787
+Environment=HOST=127.0.0.1
+Environment=DB_PATH=/var/lib/daiyan/empire.db
+Environment=TICK_MS=180000
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+; 基础加固
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/daiyan
+
+[Install]
+WantedBy=multi-user.target
