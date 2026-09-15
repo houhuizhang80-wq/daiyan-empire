@@ -531,6 +531,43 @@ const ACTIONS = [
    run:(C)=>({eff:{network:J(12),guile:J(6)},rel:[[C.t.id,'confidant',30]],
      log:`你把一件不便见光的事托给了 ${C.t.name}。他没有多问，只是点了点头。`})},
 
+  {key:'impeach_sub',path:'open',name:'参劾罢黜',desc:'具本参劾一名下官，历数其考成疏漏。成则其人降级 —— 让满朝知道你的话有分量。',cost:{mandate:4},cd:2,target:1,
+   req:(C)=>{ if(!C.t) return '须择一人参劾。';
+     if(C.t.id===C.p.id) return '不可自劾。';
+     if(C.p.rank<4) return '官微言轻 —— 至少做到县令，才谈得上参人。';
+     if(C.t.rank>=C.p.rank) return '对方官阶不低于你，参不动。';
+     if(rel(C.p.id,C.t.id,'protege')||rel(C.p.id,C.t.id,'confidant')) return '自己人，劾他做什么。';
+     if(rel(C.t.id,C.p.id,'patron')) return '他是你的恩主 —— 参恩主要被天下人戳脊梁。';
+     return null; },
+   run:(C)=>{
+     const t=C.t, me=C.p;
+     const power=powerOf(me)+me.stats.favor*0.3;
+     const def=powerOf(t)+t.stats.renown*0.5+30;
+     if(power>def*rnd(0.75,1.2)){
+       // 参劾得直：对方直接降一级 —— 这是本作里「权力」最直接的形态
+       releaseSlots(t.id);
+       t.rank=Math.max(0,t.rank-1); t.tenure=0;
+       t.stats.exposure=Math.min(100,t.stats.exposure+30);
+       t.stats.favor=Math.round(t.stats.favor*0.6);
+       if(t.rank>=CONST.CONTESTED_FROM) takeSlot(t,t.rank);
+       return {eff:{favor:-J(6),renown:J(14)},rel:[[t.id,'nemesis',45]],
+         log:`你具本参劾 ${t.name}，历数其考成疏漏。旨意下来：${t.name} 降为 ${RANK[t.rank].grade}${RANK[t.rank].title}。满朝都看在眼里。`};
+     }
+     return {eff:{exposure:J(14,0.3),renown:-J(10),favor:-J(6)},rel:[[t.id,'nemesis',40]],
+       log:`参劾未中。${t.name} 自辩得直，反咬你挟私报复 —— 朝议汹汹。`}; }},
+
+  {key:'boost',path:'open',name:'擢升亲信',desc:'把门下能员的名字放进考语里。他的升迁，就是你的臂膀。',cost:{mandate:3},cd:1,target:1,
+   req:(C)=>{ if(!C.t) return '须择一人擢拔。';
+     if(C.t.id===C.p.id) return '不必拔自己。';
+     if(C.t.rank>=C.p.rank) return '只能擢拔官阶低于你的人。';
+     if(!['protege','confidant','ally','kin'].some(tp=>rel(C.p.id,C.t.id,tp))) return '没有情分，擢拔就是徇私 —— 先结成门生或心腹。';
+     return null; },
+   run:(C)=>{ const t=C.t;
+     const add=Math.round(RANK[Math.min(MAX_RANK,t.rank+1)].cap*0.18);
+     apply(t,{merit:add,favor:J(10)});
+     apRel(t.id,C.p.id,'patron',12);
+     return {eff:{network:J(8)},log:`你在考语里把 ${t.name} 放在了最前面。他知道这份情是谁的。`}; }},
+
   {key:'grease',path:'open',name:'打点铨曹',desc:'给吏部堂官递一份厚礼。不保证升官，但下次铨选多几分成算。',cost:{silver:260},cd:3,
    run:()=>({grease:0.12,eff:{exposure:J(4,0.5)},log:'帖子递进去了，回话很客气：「你的考语，我看着呢。」'})},
 
@@ -575,6 +612,14 @@ const EVENTS = [
     {label:'挺身相救',cost:{mandate:3,silver:200},eff:{network:26,favor:-12,renown:18},desc:'义气换人脉，代价是上峰的不快。'},
     {label:'闭门不言',cost:{},eff:{network:-16,favor:6,exposure:-6},desc:'保全自己，寒了人心。'},
     {label:'顺势参一本',cost:{mandate:2},eff:{favor:18,network:-30,renown:-24,guile:12},desc:'踩着恩主往上走。走得快，也走得绝。'}]},
+  {key:'lawsuit',w:8,min:3,max:17,title:'田讼',text:'豪绅与佃户争一块田，各执一词，案子递到了你的案头。',opts:[
+    {label:'判豪绅胜',cost:{},eff:{silver:220,favor:8,renown:-16,exposure:10},desc:'士绅的谢仪很丰厚，清议的唾沫也是。'},
+    {label:'判佃户胜',cost:{},eff:{renown:18,favor:-6,network:-10},desc:'百姓称颂青天 —— 士绅从此处处使绊子。'},
+    {label:'发回重勘',cost:{mandate:2},eff:{merit:10,favor:2},desc:'拖字诀，两边都不得罪，也两边都不谢你。'}]},
+  {key:'graft_case',w:8,min:5,max:17,title:'贪墨',text:'你的属官贪墨赈银事发，人赃并获，就押在廊下等你发落。',opts:[
+    {label:'依律严办',cost:{},eff:{renown:16,favor:-8,network:-8},desc:'断人财路如杀人父母，官场自此说你苛刻。'},
+    {label:'轻纵分润',cost:{},eff:{silver:260,favor:6,exposure:14,renown:-12},desc:'他懂规矩，你也懂。只是赃银过了你的手。'},
+    {label:'据实上报',cost:{mandate:1},eff:{merit:10,favor:4,exposure:-4},desc:'公事公办。上头夸你持正，同僚从此防你。'}]},
   {key:'secret_letter',w:7,min:6,max:17,title:'密札',text:'一封没有署名的信送到案头，只写了四个字：「月满则亏」。',opts:[
     {label:'焚之',cost:{},eff:{exposure:-18,guile:6},desc:'不管是谁，先把痕迹清干净。'},
     {label:'暗中查访',cost:{silver:120},eff:{guile:20,network:8,exposure:6},desc:'你想知道是谁在看你。'},

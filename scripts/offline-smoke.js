@@ -286,7 +286,64 @@ const rs = G.doAct('resign', null);
 ok(G.getS().over && G.getS().over.type === 'retire', '告病致仕触发收场', JSON.stringify(G.getS().over));
 ok(/解印|不问朝事/.test(G.getS().over.note), '致仕结局有说明', G.getS().over.note);
 
-/* ── 18. 运行时错误 ── */
+/* ── 18. 权力：参劾罢黜 —— 一句话让下官降级 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 0; S.me.cd = {};
+S.me.rank = 8; S.me.stats.favor = 500; S.me.stats.renown = 800; S.me.stats.merit = 5000;
+S.me.stats.network = 900;
+S.me.stats.exposure = 0;
+// 造一个权势明显更弱的下属 —— rank 与 stats 必须一起改，
+// 否则他顶着从三品的功绩人脉，名义上是州判、实际上权势比你还大
+const underling = S.npcs.find((n) => !n.retired && n.rank >= 4);
+underling.rank = 5;
+underling.stats = { merit: 100, renown: 10, guile: 30, network: 60, favor: 10, exposure: 0, health: 100 };
+underling.res = { silver: 300, mandate: 24, influence: 0 };
+S.me.cd = {};
+const imp1 = G.doAct('impeach_sub', underling.id);
+S = G.getS();
+const target = S.npcs.find((n) => n.id === underling.id);
+const demoted = imp1.log && /降为/.test(imp1.log);
+ok(!!imp1.log, '参劾有结果', imp1.err || '');
+ok(demoted ? target.rank < 5 : target.rank >= 5, demoted ? '参劾得直，下官降级' : '参劾未中，目标未降', imp1.log || '');
+ok(demoted, '本测试种子下参劾应成功（权力可改变他人官阶）', imp1.log || '');
+if (demoted) ok(S.rels.some((r) => r.from === 0 && r.to === target.id && r.type === 'nemesis'), '被参者与你结死仇');
+
+// 门槛：官阶不高于对方时参不动
+S.me.cd = {};
+const under2 = S.npcs.find((n) => !n.retired && n.id !== underling.id && n.rank >= 8);
+if (under2) {
+  const imp2 = G.doAct('impeach_sub', under2.id);
+  ok(!!imp2.err, '官阶不低于对方时拒绝参劾', imp2.err || imp2.log || '竟无阻碍');
+}
+
+/* ── 19. 权力：擢升亲信 —— 门生真的会因你升官 ── */
+S = G.getS();
+S.over = null; S.me.cd = {}; S.me.rank = 8;
+const protege = S.npcs.find((n) => !n.retired && n.id !== underling.id && n.rank < 8 && n.rank >= 4);
+protege.rank = 5;
+S.rels.push({ from: 0, to: protege.id, type: 'protege', s: 50 });
+const meritBefore = protege.stats.merit;
+S.me.cd = {};
+const b1 = G.doAct('boost', protege.id);
+S = G.getS();
+const p2 = S.npcs.find((n) => n.id === protege.id);
+ok(!b1.err && p2.stats.merit > meritBefore, '擢升亲信给对方实打实的功绩', b1.err || `${meritBefore}→${p2.stats.merit}`);
+ok(S.rels.some((r) => r.from === protege.id && r.to === 0 && r.type === 'patron'), '亲视你为恩主');
+
+// 门槛：非亲信不能擢拔
+S.me.cd = {};
+const stranger = S.npcs.find((n) => !n.retired && n.id !== protege.id && n.rank < 8);
+if (stranger) {
+  const b2 = G.doAct('boost', stranger.id);
+  ok(!!b2.err, '对无情分者拒绝擢拔', b2.err || b2.log || '竟无阻碍');
+}
+
+/* ── 20. 裁决权：田讼与贪墨事件 ── */
+function EVENTS_LEN() { return G.EVENTS.length; }
+ok(EVENTS_LEN() === 10, '事件模板 10 类（含田讼、贪墨）', String(EVENTS_LEN()));
+ok(G.EVENTS.some((e) => e.key === 'lawsuit') && G.EVENTS.some((e) => e.key === 'graft_case'), '裁决类事件已注册');
+
+/* ── 21. 运行时错误 ── */
 ok(errors.length === 0, '运行期无脚本错误', errors.join(' | '));
 
 console.log(`\n▌结果：${pass} 通过 / ${fail} 失败\n`);
