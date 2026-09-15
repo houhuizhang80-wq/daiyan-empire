@@ -634,6 +634,20 @@ const EVENTS = [
     {label:'回帖试探',cost:{mandate:1},eff:{guile:12,exposure:14,network:14},desc:'入局容易，出局难。'}]},
 ];
 
+/* ── 圣心：皇帝的阶段性偏好，每 10-18 回合翻转一次 ──
+   只放大正收益，不改变闯祸的代价 —— 上意让你得意，不替你消灾 */
+const MOODS={
+  shiwu:{name:'务实',tip:'言改革者进，坐而论道者渐疏。',meritX:1.3,renownX:0.8},
+  qingliu:{name:'清议',tip:'喜直臣，重风宪。声名起处，圣眷亦起。',meritX:0.85,renownX:1.5},
+};
+function moodEff(eff){
+  const m=S.mood&&MOODS[S.mood.type]; if(!m) return eff;
+  const e={...eff};
+  if(e.merit>0) e.merit=Math.round(e.merit*m.meritX);
+  if(e.renown>0) e.renown=Math.round(e.renown*m.renownX);
+  return e;
+}
+
 /* ── 朝议议题：每 12 回合一场，站队按朝中各派势力比掷骰定胜负 ── */
 const DEBATES=[
   {title:'漕运改折',text:'有司奏请漕粮改折银两，度支称便，挽卒失所。',
@@ -852,7 +866,7 @@ function doAct(key,targetId){
   if(r.guile) me.stats.guile=Math.max(0,me.stats.guile-r.guile);
   if(r.grease) me.grease=(me.grease||0)+r.grease;
 
-  const changes=apply(me,r.eff||{});
+  const changes=apply(me,moodEff(r.eff||{}));
   if(t){ apply(t,r.teff||{}); (r.rel||[]).forEach(([to,type,d])=>{ apRel(me.id,to,type,d); if(type==='protege') apRel(to,me.id,'patron',d); if(type==='patron') apRel(to,me.id,'protege',d); if(type==='kin') apRel(to,me.id,'kin',d); }); }
   if(a.cd) me.cd[key]=S.tick+a.cd;
 
@@ -989,6 +1003,12 @@ function worldTick(){
   const ero=Math.round(me.stats.exposure*CONST.EXPOSURE_EROSION*RANK_YIELD[me.rank]);
   if(ero) me.stats.favor=Math.max(0,me.stats.favor-ero);
   me.tenure++;
+  // 圣心翻转：不提前预告，只有邸报里的一阵风声
+  if(!S.mood) S.mood={type:pick(['shiwu','qingliu']),until:S.tick+ri(10,18)};
+  else if(S.tick>=S.mood.until){
+    S.mood={type:S.mood.type==='shiwu'?'qingliu':'shiwu',until:S.tick+ri(10,18)};
+    gaz('rumor',`【风闻】上心似有转移，近来${MOODS[S.mood.type].name}之说渐盛。`,0,1);
+  }
   if(S.tick%CONST.JINGCHA===0) jingcha();
   else if(S.tick%CONST.DEBATE===0) spawnDebate();
   if(Math.random()<0.1&&me.stats.health>20) spawnEvent();
@@ -1203,7 +1223,7 @@ function resolveEvent(i,oi){
     if(need) me.res.silver=Math.max(0,me.res.silver-need);
     const eff={...o.eff};
     if(eff.silver) eff.silver=Math.round(eff.silver*sc);
-    ch=apply(me,eff);
+    ch=apply(me,moodEff(eff));
   }
   S.pending.splice(i,1);
   gaz('event',`【${ev.title}】你选择了「${o.label}」。`,0,1);
@@ -1539,6 +1559,7 @@ function renderWind(){
     :`未越线（${Math.round(me.stats.exposure)}/${CONST.IMPEACH_WARN}）`}</span></div>`;
   h+=`<div class="kv"><span>落马</span><span>${cnt} / 3 次${cnt>=2?' —— 再有一次便革职为民':''}</span></div>`;
   h+=`<div class="kv"><span>京察</span><span>${CONST.JINGCHA-(S.tick%CONST.JINGCHA)} 回合后大计（功绩 ${Math.round(scoreOf(me.stats))}，过半为安）</span></div>`;
+  if(S.mood) h+=`<div class="kv"><span>圣心所在</span><span>喜「${MOODS[S.mood.type].name}」—— ${MOODS[S.mood.type].tip}（约 ${S.mood.until-S.tick} 回合后恐有变）</span></div>`;
   if(f) h+=`<div class="kv"><span>本党</span><span>${esc(f.name)} · 党员 ${mates.length} 人 · 公库 ${f.treasury} 两${
     f.leader===0?'（你是党魁）':''}</span></div>`;
   if(foes.length) h+=`<div class="fine" style="margin-top:9px">结怨：`+
@@ -1788,7 +1809,7 @@ boot();
 window.__G={getS:()=>S,setS:(o)=>{S=o},doAct,doPromote,doImpeach,worldTick,resolveEvent,readiness,
   scoreOf,powerOf,impeachRisk,freshState,save,load,startGame,ACTIONS,RANKS,EVENTS,slotStats,RANK_YIELD,
   silverNeedOf,silverScale,verdict,evaluate,endGame,factionTick,createFaction,joinFaction,leaveFaction,donate,trackPeaks,
-  jingcha,spawnDebate,resolveEvent,DEBATES};
+  jingcha,spawnDebate,resolveEvent,DEBATES,MOODS,moodEff};
 })();
 </script>
 </body>

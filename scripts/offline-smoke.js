@@ -412,7 +412,27 @@ if (myProtege) {
   ok(S.me.res.silver > mySilver, '孝敬入了你的私囊');
 }
 
-/* ── 25. 运行时错误 ── */
+/* ── 25. 圣心：上意让你得意，不替你消灾 ── */
+ok(G.MOODS && G.MOODS.shiwu.meritX === 1.3 && G.MOODS.qingliu.renownX === 1.5, '圣心两态定义正确');
+S = G.getS();
+S.over = null; S.mood = { type: 'shiwu', until: S.tick + 15 };
+S.me.stats.merit = 3000; S.me.stats.renown = 300;
+S.me.stats.network = 500; S.me.stats.favor = 300; S.me.stats.guile = 100; S.me.stats.exposure = 0;
+S.me.cd = {}; S.me.tenure = 9;
+const m0 = S.me.stats.merit;
+G.doAct('policy', null);
+S = G.getS();
+const meritGain = S.me.stats.merit - m0;
+ok(meritGain > 0, '务实期推新政有功绩', String(meritGain));
+
+// 圣心翻转：until 到期后自动切换并走漏风声
+S.mood = { type: 'shiwu', until: S.tick };
+G.worldTick();
+S = G.getS();
+ok(S.mood.type === 'qingliu', '圣心到期自动翻转', JSON.stringify(S.mood));
+ok(S.gaz.some((g) => /上心似有转移/.test(g.text)), '翻转时走漏风声');
+
+/* ── 26. 运行时错误 ── */
 ok(errors.length === 0, '运行期无脚本错误', errors.join(' | '));
 
 console.log(`\n▌结果：${pass} 通过 / ${fail} 失败\n`);
