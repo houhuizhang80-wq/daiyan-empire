@@ -11,7 +11,8 @@
     "test:promote": "node scripts/promote-test.js",
     "test:npc": "node scripts/npc-test.js",
     "test:ui": "node scripts/ui-smoke.js",
-    "test": "node scripts/promote-test.js && node scripts/npc-test.js && node scripts/smoke.js && node scripts/ui-smoke.js",
+    "test:offline": "node scripts/offline-smoke.js",
+    "test": "node scripts/promote-test.js && node scripts/npc-test.js && node scripts/offline-smoke.js && node scripts/smoke.js && node scripts/ui-smoke.js",
     "sim": "node scripts/sim.js",
     "reset": "node scripts/reset.js"
   },

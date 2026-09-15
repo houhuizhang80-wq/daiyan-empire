@@ -434,7 +434,7 @@ export const EVENT_TEMPLATES = [
     ],
   },
   {
-    key: ' impeachment',
+    key: 'rumor',
     weight: 8,
     minRank: 4,
     maxRank: 17,
