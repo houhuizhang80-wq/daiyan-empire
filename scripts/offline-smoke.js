@@ -174,10 +174,12 @@ S = G.getS();
 const evCount = S.pending.length;
 ok(evCount > 0 || true, '事件系统可运行（本轮待决 ' + evCount + ' 件）');
 if (evCount) {
+  // 朝议/大案系统会随回合自动入队，队列里可能不止一件 —— 只验证被决断的那件出队
+  const ev = S.pending[0];
   const rr = G.resolveEvent(0, 0);
   ok(!rr.err, '事件可决断', rr.err || '');
   S = G.getS();
-  ok(S.pending.length === evCount - 1, '决断后事件出队', String(S.pending.length));
+  ok(!S.pending.includes(ev), '决断后事件出队');
 }
 
 /* ── 8. 存档 ── */
@@ -397,6 +399,8 @@ ok(drop > 5 && drop < 6.9, '田庄的风声抵消了部分自然消退（衰减 
 /* ── 24. 门生孝敬：擢拔闭环的反馈 ── */
 S = G.getS();
 S.over = null;
+// 关系持久性：30 回合的朝局运转不应清掉死仇（曾有测试流程疑似丢失，加断言锁死）
+S.rels.push({ from: 40, to: 0, type: 'nemesis', s: 50 });
 const myProtege = S.npcs.find((n) => !n.retired && n.rank === 4 && n.id !== underling.id);
 if (myProtege) {
   myProtege.stats.merit = 999999; myProtege.stats.renown = 500; myProtege.stats.network = 500; myProtege.stats.favor = 500;
@@ -410,15 +414,16 @@ if (myProtege) {
   }
   ok(S.gaz.some((g) => /孝敬/.test(g.text)), '门生升官后孝敬座主', '30 回合内未触发');
   ok(S.me.res.silver > mySilver, '孝敬入了你的私囊');
+  ok(S.rels.some((r) => r.from === 40 && r.to === 0 && r.type === 'nemesis'), '30 回合后死仇仍在（关系不被周期清空）');
 }
 
 /* ── 25. 圣心：上意让你得意，不替你消灾 ── */
 ok(G.MOODS && G.MOODS.shiwu.meritX === 1.3 && G.MOODS.qingliu.renownX === 1.5, '圣心两态定义正确');
 S = G.getS();
-S.over = null; S.mood = { type: 'shiwu', until: S.tick + 15 };
+S.over = null; S.me.impeachCount = 0; S.me.cd = {};
+S.mood = { type: 'shiwu', until: S.tick + 15 };
 S.me.stats.merit = 3000; S.me.stats.renown = 300;
 S.me.stats.network = 500; S.me.stats.favor = 300; S.me.stats.guile = 100; S.me.stats.exposure = 0;
-S.me.cd = {}; S.me.tenure = 9;
 const m0 = S.me.stats.merit;
 G.doAct('policy', null);
 S = G.getS();
@@ -432,7 +437,81 @@ S = G.getS();
 ok(S.mood.type === 'qingliu', '圣心到期自动翻转', JSON.stringify(S.mood));
 ok(S.gaz.some((g) => /上心似有转移/.test(g.text)), '翻转时走漏风声');
 
-/* ── 26. 运行时错误 ── */
+/* ── 26. 传承：承先人之荫 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 0; S.me.cd = {};
+S.me.rank = 12; S.peak = 12; S.me.peakSilver = 50000; S.me.peakRenown = 900;
+const preRel = S.rels.filter((r) => r.to === 0 && ['rival', 'nemesis'].includes(r.type)).map((r) => [r.from, r.type, r.s]);
+// 确定性造父辈仇家：不依赖第 18 节参劾流程（那个 nemesis 建立在更早的状态上，可能与本节不连续）
+S.rels.push({ from: 6, to: 0, type: 'nemesis', s: 45 });
+G.endGame('retire');
+const leg = G.loadLegacy();
+ok(!!leg && leg.name === '沈砚' && leg.peak === 12, '致仕后家谱入档',
+  JSON.stringify({ preRel, enemies: leg && leg.enemies }));
+
+G.startGame('沈氏子', 'legacy', leg);
+S = G.getS();
+ok(S.me.rank >= 2 && S.me.rank <= 5, `荫叙起步官阶合理（当前 ${S.me.rank + 1} 品）`, String(S.me.rank));
+ok(S.rels.some((r) => r.from !== 0 && r.to === 0 && r.type === 'rival'), '父亲的仇家在本朝等着你',
+  'enemies=' + JSON.stringify(leg.enemies) + ' rivalTo0=' + S.rels.filter((r) => r.to === 0 && r.type === 'rival').length);
+ok(S.rels.some((r) => r.from !== 0 && r.to === 0 && r.type === 'patron'), '父亲的故吏提携你');
+ok(S.me.res.silver > 320, '家产部分入你私囊', String(S.me.res.silver));
+ok(S.gaz.some((g) => /承先|父荫/.test(g.text)), '开局邸报写明身世');
+
+// 罢黜不得荫叙：不写入新档（旧档不受影响）
+S.me.impeachCount = 3; G.endGame('dismiss');
+ok(G.loadLegacy() && G.loadLegacy().peak === 12, '罢黜不覆盖旧荫档');
+
+/* ── 27. 御前奏对：顺着圣心答 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 0; S.me.cd = {};
+S.me.rank = 8; S.mood = { type: 'shiwu', until: S.tick + 10 };
+S.pending = [];
+const aud = G.doAct('audience', null);
+S = G.getS();
+ok(!aud.err && S.pending.some((e) => e.title === '御前奏对'), '奏对入待决', aud.err || '');
+const audEv = S.pending.find((e) => e.title === '御前奏对');
+const favorBeforeAud = S.me.stats.favor;
+G.resolveEvent(S.pending.indexOf(audEv), 0);
+S = G.getS();
+ok(S.me.stats.favor > favorBeforeAud, '顺应圣心的奏对得恩宠', `${favorBeforeAud}→${S.me.stats.favor}`);
+S.me.cd = {}; S.me.rank = 2;
+const aud2 = G.doAct('audience', null);
+ok(!!aud2.err, '官卑不得面圣', aud2.err || '');
+
+/* ── 28. 大案要案：河工贪案三段链 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 0;
+S.me.rank = 8; S.me.res.mandate = 200; S.me.stats.exposure = 0;
+S.case = { key: 'river', stage: 1, vars: {} };
+S.pending = S.pending.filter((e) => !e.caseStage);
+G.pushCaseEvent(1);
+S = G.getS();
+let caseEv = S.pending.find((e) => e.caseStage === 1);
+ok(!!caseEv, '河工案入待决');
+G.resolveEvent(S.pending.indexOf(caseEv), 0); // 按册彻查
+S = G.getS();
+ok(S.case && S.case.stage === 2, '链推进到第二段', JSON.stringify(S.case));
+caseEv = S.pending.find((e) => e.caseStage === 2);
+ok(!!caseEv, '第二段入待决');
+G.resolveEvent(S.pending.indexOf(caseEv), 0); // 密奏御前
+S = G.getS();
+caseEv = S.pending.find((e) => e.caseStage === 3);
+ok(!!caseEv, '第三段定谳入待决');
+const renownBeforeCase = S.me.stats.renown;
+G.resolveEvent(S.pending.indexOf(caseEv), 0);
+S = G.getS();
+ok(S.case === null, '结案归档');
+ok(S.me.stats.renown > renownBeforeCase, '掀盖子得清名', `${renownBeforeCase}→${S.me.stats.renown}`);
+
+/* ── 29. 随机朝局 ── */
+G.startGame('沈砚', 'han');
+S = G.getS();
+ok(!!S.variant && !!S.variant.name, '本局有朝局变体', JSON.stringify(S.variant));
+ok(S.gaz.some((g) => /本朝气象/.test(g.text)), '开局邸报声明气象');
+ok(G.VARIANTS.length === 4, '变体库 4 种', String(G.VARIANTS.length));
+
+/* ── 30. 运行时错误 ── */
 ok(errors.length === 0, '运行期无脚本错误', errors.join(' | '));
 
 console.log(`\n▌结果：${pass} 通过 / ${fail} 失败\n`);

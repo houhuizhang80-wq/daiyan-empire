@@ -579,6 +579,21 @@ const ACTIONS = [
   {key:'grease',path:'open',name:'打点铨曹',desc:'给吏部堂官递一份厚礼。不保证升官，但下次铨选多几分成算。',cost:{silver:260},cd:3,
    run:()=>({grease:0.12,eff:{exposure:J(4,0.5)},log:'帖子递进去了，回话很客气：「你的考语，我看着呢。」'})},
 
+  {key:'audience',path:'open',name:'御前奏对',desc:'递牌子求觐见。圣心难测 —— 答对了是恩宠，答岔了是失仪。',cost:{mandate:2},cd:8,
+   req:(C)=>C.p.rank<4?'官卑者不得面圣 —— 至少做到县令。':null,
+   run:(C)=>{
+     const m=S.mood?S.mood.type:'shiwu';
+     S.pending.push({key:'audience',title:'御前奏对',tick:S.tick,opts:[
+       m==='shiwu'
+        ? {label:'条陈钱粮边务',desc:'上心正在实务，你说的正是他想听的。',cost:{},eff:{favor:J(25),merit:J(8)}}
+        : {label:'条陈风宪得失',desc:'上心正在清议，你说的正是他想听的。',cost:{},eff:{favor:J(25),renown:J(10)}},
+       m==='shiwu'
+        ? {label:'畅言风宪清议',desc:'上正问钱粮，你偏说风骨……',cost:{},eff:{favor:-J(10),renown:J(6)}}
+        : {label:'只陈钱粮例务',desc:'上正想听些新气象，你却背账本……',cost:{},eff:{favor:-J(10)}},
+       {label:'唯唯而退',desc:'不答，不错，无功。',cost:{},eff:{favor:J(3)}},
+     ]});
+     return {log:'召对得允。你把要说的话在心里过了三遍。'}; }},
+
   {key:'resign',path:'career',name:'告病致仕',desc:'自请去职，退归林下。本局就此收场，按生平功过作一次总评。',cost:{},cd:0,
    run:()=>({retire:1,log:'疏上，准了。你解下印绶，走出衙门时天刚亮。'})},
 ];
@@ -1004,13 +1019,15 @@ function worldTick(){
   if(ero) me.stats.favor=Math.max(0,me.stats.favor-ero);
   me.tenure++;
   // 圣心翻转：不提前预告，只有邸报里的一阵风声
-  if(!S.mood) S.mood={type:pick(['shiwu','qingliu']),until:S.tick+ri(10,18)};
+  const span=S.moodFast?ri(5,9):ri(10,18);
+  if(!S.mood) S.mood={type:pick(['shiwu','qingliu']),until:S.tick+span};
   else if(S.tick>=S.mood.until){
-    S.mood={type:S.mood.type==='shiwu'?'qingliu':'shiwu',until:S.tick+ri(10,18)};
+    S.mood={type:S.mood.type==='shiwu'?'qingliu':'shiwu',until:S.tick+span};
     gaz('rumor',`【风闻】上心似有转移，近来${MOODS[S.mood.type].name}之说渐盛。`,0,1);
   }
   if(S.tick%CONST.JINGCHA===0) jingcha();
   else if(S.tick%CONST.DEBATE===0) spawnDebate();
+  maybeBigCase();
   if(Math.random()<0.1&&me.stats.health>20) spawnEvent();
 
   npcTick();
@@ -1160,6 +1177,45 @@ function spawnDebate(){
   gaz('system',`朝议起：「${t.title}」。各方都在递帖子拉人。`,0,1);
 }
 
+/* ── 大案要案：跨回合事件链，前面的选择决定后面拿到什么牌 ── */
+const BIGCASE={
+  river:{
+    1:{title:'河工贪案 · 发端',text:'你治下河工银两层层剥蚀，堤成即溃，灾民塞道。此时一份匿名账册送到案头。',
+       opts:[
+        {label:'按册彻查',desc:'牵连必广，但堤不能再溃了。',cost:{mandate:3},next:2,mark:'investigate'},
+        {label:'压下账册',desc:'上头递了话，银子也递了。',cost:{},next:0,mark:'suppress',eff:{silver:400,exposure:16,renown:-10}},
+       ]},
+    2:{title:'河工贪案 · 顺藤',text:'查下来，河银有四成过了京里两位大员的门。折子怎么递，取决于你想动谁。',
+       opts:[
+        {label:'密奏御前',desc:'掀开盖子 —— 也把自己放在火上。',cost:{mandate:4},next:3,mark:'imperial'},
+        {label:'只办典史顶罪',desc:'拿两个小吏结案，大员们记你懂事。',cost:{mandate:1},next:3,mark:'small'},
+       ]},
+    3:{title:'河工贪案 · 定谳',text:'钦案将结。你把案卷誊清，在末页附上了自己的名字。',
+       opts:[{label:'结案归档',desc:'案卷入库，风波入史。',cost:{},next:0,mark:'done'}]},
+  }
+};
+function pushCaseEvent(n){
+  const c=S.case; if(!c) return;
+  const st=BIGCASE[c.key][n];
+  let opts=st.opts;
+  if(n===3){
+    // 结局效果取决于第二段的抉择：掀盖子还是只拍苍蝇
+    if(c.vars.c2==='imperial'){
+      const loyal=S.mood&&S.mood.type==='qingliu';
+      opts=[{label:'结案归档',desc:loyal?'圣心正喜直臣 —— 你的名字会进史册。':'上头记下了你这次多嘴。',cost:{},next:0,mark:'done',
+        eff:{merit:40,renown:J(30),network:-J(15),exposure:J(8),favor:loyal?J(15):-J(10)}}];
+    }else if(c.vars.c2==='small'){
+      opts=[{label:'结案归档',desc:'上头觉得你懂事。账面上滴水不漏。',cost:{},next:0,mark:'done',
+        eff:{merit:15,network:J(12),renown:-J(10)}}];
+    }
+  }
+  S.pending.push({key:`case_${c.key}_${n}`,caseStage:n,title:st.title,text:st.text,tick:S.tick,opts});
+}
+function maybeBigCase(){
+  if(S.case||S.me.rank<5||S.tick<30) return;
+  if(Math.random()<0.06){ S.case={key:'river',stage:1,vars:{}}; pushCaseEvent(1); }
+}
+
 /** 党内提携：党中有人比你高，才会替你说话；党势越厚，话越管用 */
 function factionTick(){  const me=S.me; if(!me.faction||S.over) return;
   const f=S.factions.find(x=>x.id===me.faction); if(!f) return;
@@ -1178,6 +1234,7 @@ function replenish(){
   const free=S.slots.filter(s=>s.holder===null).length;
   const live=S.npcs.filter(n=>!n.retired).length;
   if(free<10||live>=70) return;
+  if(S.scarce&&Math.random()<0.6) return; // 朝局变体「缺额紧张」：出缺寥寥，升迁更挤
   const id=Math.max(0,...S.npcs.map(n=>n.id))+1;
   const used=new Set([...S.npcs.map(n=>n.name),S.me.name]);
   const rank=pick([4,5,6,7,9,10]);
@@ -1228,6 +1285,12 @@ function resolveEvent(i,oi){
   S.pending.splice(i,1);
   gaz('event',`【${ev.title}】你选择了「${o.label}」。`,0,1);
   if(note) gaz('event',note,0,1);
+  // 大案链：记录抉择并推进下一段，末段归档
+  if(ev.caseStage&&S.case){
+    S.case.vars=Object.assign(S.case.vars||{},{['c'+ev.caseStage]:o.mark});
+    if(o.next){ S.case.stage=o.next; pushCaseEvent(o.next); }
+    else { S.case=null; gaz('system','河工贪案就此归档。多年后说起那场大水，还有人提起你的名字。',0,1); }
+  }
   if(Math.random()<impeachRisk(me.stats.exposure)){ const im=doImpeach(me); save(); return {ch,imp:im}; }
   save();
   return {ch};
@@ -1283,6 +1346,8 @@ function endGame(type,note){
   if(S.over) return S.over;
   S.over={type,note:note||(END_META[type]||{}).note||'',tick:S.tick};
   gaz('end',`【${(END_META[type]||{}).title||'收场'}】${S.over.note}`,0,1);
+  // 罪臣子孙不得荫叙 —— 罢黜出局，家底清零
+  if(type!=='dismiss'){ try{ localStorage.setItem(LEGACY_KEY,JSON.stringify(buildLegacy())); }catch(e){} }
   save();
   return S.over;
 }
@@ -1336,6 +1401,59 @@ function trackPeaks(){
   S.peak=Math.max(S.peak||0,me.rank);
   me.peakRenown=Math.max(me.peakRenown||0,me.stats.renown);
   me.peakSilver=Math.max(me.peakSilver||0,me.res.silver);
+}
+
+/* ══════════ 传承：承先人之荫 ══════════
+   罪臣子孙不得荫叙（罢黜出局无传承）；致仕与在位首辅都可以把家底交给儿子 ——
+   仇家、故吏、党籍与没洗干净的旧账，一并算在下一代头上 */
+const LEGACY_KEY='daiyan_legacy_v1';
+function loadLegacy(){ try{ const s=localStorage.getItem(LEGACY_KEY); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function legacyRank(l){ return Math.min(5,Math.max(2,Math.floor((l.peak||0)/4))); }
+
+function buildLegacy(){
+  const rels=S.rels;
+  const nm=(id)=>{ const p=byId(id); return p?p.name:null; };
+  return {
+    name:S.me.name, peak:S.peak||0,
+    silver:Math.round((S.me.peakSilver||0)*0.3),
+    renown:S.me.peakRenown||0, clean:evaluate().clean,
+    faction:(S.factions.find(f=>f.id===S.me.faction&&f.leader===0)||{}).name||null,
+    enemies:rels.filter(r=>r.to===0&&['rival','nemesis'].includes(r.type)).map(r=>nm(r.from)).filter(Boolean),
+    patrons:rels.filter(r=>r.to===0&&['patron','ally','confidant'].includes(r.type)).map(r=>nm(r.from)).filter(Boolean),
+    proteges:rels.filter(r=>r.from===0&&r.type==='protege').map(r=>nm(r.to)).filter(Boolean),
+  };
+}
+
+function applyLegacy(st,leg){
+  const r0=legacyRank(leg);
+  st.me.rank=r0; st.me.tenure=0;
+  if(r0>=CONST.CONTESTED_FROM) takeSlot(st.me,r0);
+  st.me.res.silver=Math.min(99999,CONST.START_SILVER+Math.round((leg.silver||0)));
+  st.me.stats.renown=Math.max(st.me.stats.renown,Math.round((leg.renown||0)*0.4));
+  st.me.stats.favor+=Math.max(-10,Math.min(40,Math.round((leg.clean||0)/20)));
+  // 父亲留下的具体的人：旧仇与故吏各取前三人，把他们的名字安到本朝的官员头上
+  // 注意不能走 apRel —— 仇怨是负增量，而 apRel 只在 d>0 时新建关系，负值会被静默丢弃
+  const byRole=(list,type,s)=>{ (list||[]).slice(0,3).forEach((nmm,i)=>{
+    const n=st.npcs.filter(x=>!x.retired&&x.rank>=3)[i*3];
+    if(n&&nmm){
+      n.name=nmm;
+      if(!st.rels.some(r=>r.from===n.id&&r.to===0&&r.type===type)) st.rels.push({from:n.id,to:0,type,s:clamp(s,0,100)});
+      if(!st.rels.some(r=>r.from===0&&r.to===n.id&&r.type===type)) st.rels.push({from:0,to:n.id,type,s:clamp(s,0,100)});
+    }
+  });};
+  byRole(leg.enemies,'rival',40);
+  byRole(leg.patrons,'patron',35);
+  byRole(leg.proteges,'ally',30);
+  if(leg.faction&&!st.me.faction){
+    const old=st.factions.find(f=>f.id===leg.faction) || null;
+    // 父亲自创的党在本朝重建
+    if(!st.factions.some(f=>f.name===leg.faction)){
+      st.factions.push({id:st.factions.length+1,name:leg.faction,doctrine:'qingliu',motto:'承先君之志',leader:0,treasury:0,power:0});
+    }
+    st.me.faction=st.factions.find(f=>f.name===leg.faction).id;
+  }
+  st.me.legacyName=leg.name;
+  gaz('system',`你是${leg.name}之后。父荫给了你一个${RANK[r0].grade}${RANK[r0].title}的出身${leg.enemies&&leg.enemies.length?'，也给了你他的仇家':''}。`,0,1);
 }
 /* ══════════ 四、界面 ══════════ */
 
@@ -1434,6 +1552,7 @@ function renderOver(){
     <div class="kv"><span>门下与姻亲</span><span>${e.ties} 人${S.me.faction?' · 在党':''}</span></div>
     <h4 class="sec">生平大事</h4>
     ${milestones.map(g=>`<div class="gaz"><span class="t">${g.tick}</span>${esc(g.text)}</div>`).join('')||'<div class="fine">史册无载。</div>'}
+    ${S.over.type!=='dismiss'?'<div class="fine" style="margin-top:10px">你的家底、故吏与仇家已记入家谱 —— 重开时可选「承先人之荫」，换个名字接着下这盘棋。</div>':''}
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       <button class="btn primary" id="ov-new">重开一局</button>
       <button class="btn" id="ov-gaz">翻看完整邸报</button>
@@ -1764,17 +1883,47 @@ $('btn-tick').onclick=()=>{
 };
 
 /* ── 启动 ── */
-function startGame(name,origin){
-  freshState(name,origin); save(); renderAll(); setupAuto();
+/* ── 随机朝局：每局随机降临一种气象，重开重掷 ── */
+const VARIANTS=[
+  {key:'young',name:'主少国疑',desc:'上春秋尚幼，母族临朝 —— 圣心翻转更频。'},
+  {key:'imbalance',name:'党势失衡',desc:'一党坐大二十年，其余诸党形同虚设。'},
+  {key:'scarcity',name:'缺额紧张',desc:'诸部久不迁转，出缺寥寥，铨选愈挤。'},
+  {key:'calm',name:'承平日久',desc:'朝局安稳，无风无浪 —— 也无特别的机会。'},
+];
+function applyVariant(){
+  const v=pick(VARIANTS); S.variant=v;
+  if(v.key==='young') S.moodFast=true;
+  if(v.key==='scarcity') S.scarce=true;
+  if(v.key==='imbalance'){
+    const f=pick(S.factions);
+    S.npcs.filter(n=>n.faction===f.id&&!n.retired).slice(0,3).forEach(n=>{
+      if(n.rank<13){ releaseSlots(n.id); n.rank=Math.min(MAX_RANK,n.rank+2); n.stats.merit=RANK[n.rank].cap*0.8;
+        if(n.rank>=CONST.CONTESTED_FROM) takeSlot(n,n.rank); }
+    });
+  }
+  gaz('system',`本朝气象：「${v.name}」—— ${v.desc}`,0,1);
+}
+
+function startGame(name,origin,legacy){
+  freshState(name,origin==='legacy'?'han':origin);
+  if(origin==='legacy'&&legacy) applyLegacy(S,legacy);
+  applyVariant();
+  save(); renderAll(); setupAuto();
   $('splash').classList.add('hidden');
 }
 let ORIGIN_SEL='han';
 
 function boot(){
   // 出身以卡片呈现：起手加成直接标出来，不必靠一行下拉文案去猜
-  $('sp-origins').innerHTML=ORIGINS.map(o=>{
-    const chips=Object.keys(o.st)
-      .map(k=>`<i>${STAT_NAME[k]} ${o.st[k]>0?'+':''}${o.st[k]}</i>`)
+  // 有先人余荫时，最前面多一张「承先人之荫」
+  const leg=loadLegacy();
+  const originList=leg?[{key:'legacy',name:'承先人之荫',
+    desc:`${leg.name} 之后。父荫与父仇，一并继承。`,
+    st:{},res:{silver:Math.min(99999,CONST.START_SILVER+Math.round(leg.silver||0))},
+    legacyChips:[`清名 ${Math.round(leg.clean)>=0?'+':''}${Math.round(leg.clean)}`,`起 ${RANK[legacyRank(leg)].title}`]},...ORIGINS]:ORIGINS;
+  $('sp-origins').innerHTML=originList.map(o=>{
+    const chips=(o.legacyChips?o.legacyChips.map(c=>`<i>${c}</i>`)
+      :Object.keys(o.st).map(k=>`<i>${STAT_NAME[k]} ${o.st[k]>0?'+':''}${o.st[k]}</i>`))
       .concat(`<i>银两 +${o.res.silver}</i>`).join('');
     const on=o.key===ORIGIN_SEL;
     return `<div class="origin${on?' on':''}" data-o="${o.key}" role="radio" aria-checked="${on}">
@@ -1798,7 +1947,7 @@ function boot(){
   }
   $('sp-start').onclick=()=>{
     const n=($('sp-name').value||'').trim()||'沈砚';
-    startGame(n,ORIGIN_SEL);
+    startGame(n,ORIGIN_SEL,ORIGIN_SEL==='legacy'?loadLegacy():null);
   };
   // 首次渲染一份空壳，避免报错
   S=S||freshState('沈砚','han');
@@ -1809,7 +1958,7 @@ boot();
 window.__G={getS:()=>S,setS:(o)=>{S=o},doAct,doPromote,doImpeach,worldTick,resolveEvent,readiness,
   scoreOf,powerOf,impeachRisk,freshState,save,load,startGame,ACTIONS,RANKS,EVENTS,slotStats,RANK_YIELD,
   silverNeedOf,silverScale,verdict,evaluate,endGame,factionTick,createFaction,joinFaction,leaveFaction,donate,trackPeaks,
-  jingcha,spawnDebate,resolveEvent,DEBATES,MOODS,moodEff};
+  jingcha,spawnDebate,resolveEvent,DEBATES,MOODS,moodEff,pushCaseEvent,applyVariant,loadLegacy,applyLegacy,VARIANTS};
 })();
 </script>
 </body>
