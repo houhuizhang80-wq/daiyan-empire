@@ -564,6 +564,71 @@ G.save(2);
 try { w.localStorage.removeItem('daiyan.offline.v1.2'); } catch (e) {}
 ok(!w.localStorage.getItem('daiyan.offline.v1.2'), '档位可删除');
 
+/* ── 30. 新案三条：驿传 / 仓廪 / 冤狱 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 0;
+S.me.rank = 9; S.me.res.mandate = 300; S.me.stats.exposure = 0;
+S.pending = S.pending.filter((e) => !e.caseStage);
+S.me.stats.renown = 200;
+const runCase = (key, opt1, opt2) => {
+  S = G.getS();
+  S.case = { key, stage: 1, vars: {} };
+  S.pending = S.pending.filter((e) => !e.caseStage);
+  G.pushCaseEvent(1);
+  S = G.getS();
+  G.resolveEvent(S.pending.findIndex((e) => e.caseStage === 1), opt1);
+  S = G.getS();
+  G.resolveEvent(S.pending.findIndex((e) => e.caseStage === 2), opt2);
+  S = G.getS();
+  const fin = S.pending.find((e) => e.caseStage === 3);
+  G.resolveEvent(S.pending.indexOf(fin), 0);
+  S = G.getS();
+  return S.case === null;
+};
+const renown0 = S.me.stats.renown;
+ok(runCase('post', 0, 0), '驿传案走完（越衙参奏线）');
+ok(S.me.stats.renown > renown0, '驿传案越衙得声名', `${renown0}→${S.me.stats.renown}`);
+const renown1 = S.me.stats.renown;
+ok(runCase('granary', 0, 0), '仓廪案走完（连前官一并参奏线）');
+ok(S.me.stats.renown > renown1, '仓廪案清仓得声名', `${renown1}→${S.me.stats.renown}`);
+const renown2 = S.me.stats.renown;
+ok(runCase('injustice', 0, 0), '冤狱案走完（依律翻案线）');
+ok(S.me.stats.renown > renown2, '冤狱案翻案得声名', `${renown2}→${S.me.stats.renown}`);
+ok(Object.keys(G.BIGCASE || {}).length === 6, '大案库 6 条', String(Object.keys(G.BIGCASE || {}).length));
+
+/* ── 31. 传承两代：代数、世系、家声、家风 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 0;
+S.me.rank = 12; S.peak = 12; S.me.peakSilver = 50000; S.me.peakRenown = 900;
+S.rels.push({ from: 6, to: 0, type: 'nemesis', s: 45 });
+G.endGame('retire');
+let leg2 = G.loadLegacy();
+// 本测试串在多次收场之后，代数用「比上一份家谱 +1」的相对断言，不写死绝对值
+ok(leg2.generation === leg.generation + 1, '世代 +1 入档', `${leg.generation}→${leg2.generation}`);
+ok(leg2.lineage.length === Math.min(4, leg.lineage.length + 1) && leg2.lineage[leg2.lineage.length - 1] === '沈砚', '世系续写', JSON.stringify(leg2.lineage));
+ok(leg2.familyRep > 0, '家声累积了先人清名', String(leg2.familyRep));
+ok(leg2.trait === 'careful', '致仕传「谨守」家风');
+
+G.startGame('沈砚', 'legacy', leg2);
+S = G.getS();
+ok(S.me.legacyGen === leg2.generation && S.me.legacyLineage.length >= 2, '开局带世系');
+ok(S.traitCareful === true, '家风「谨守」生效（暴露每回合多退 1）');
+ok(S.gaz.some((g) => /家风/.test(g.text)), '开局邸报写明家风', S.gaz[0] && S.gaz[0].text);
+
+// 二代再致仕 → 三代
+S.me.rank = 13; S.peak = 13; S.over = null; S.me.impeachCount = 0;
+S.me.peakSilver = 60000; S.me.peakRenown = 1000;
+G.endGame('retire');
+const leg3 = G.loadLegacy();
+ok(leg3.generation === leg2.generation + 1, '第三代入档', `${leg2.generation}→${leg3.generation}`);
+ok(leg3.lineage[leg3.lineage.length - 1] === '沈砚' && leg3.lineage.length >= 3, '世系续写', JSON.stringify(leg3.lineage));
+ok(leg3.familyRep >= leg2.familyRep, '家声逐代累积', `${leg2.familyRep}→${leg3.familyRep}`);
+// 位极人臣收场传「勋阀」
+S = G.getS();
+S.over = null;
+G.endGame('peak');
+ok(G.loadLegacy().trait === 'aristocrat', '位极人臣传「勋阀」家风');
+
 /* ── 32. 运行时错误 ── */
 ok(errors.length === 0, '运行期无脚本错误', errors.join(' | '));
 

@@ -1014,7 +1014,7 @@ function worldTick(){
   }
   me.res.mandate=r.mandate;
   me.stats.health=clamp(me.stats.health+CONST.HEALTH_REGEN,0,100);
-  me.stats.exposure=clamp(me.stats.exposure-CONST.EXPOSURE_DECAY,0,CONST.MAX_EXPOSURE);
+  me.stats.exposure=clamp(me.stats.exposure-CONST.EXPOSURE_DECAY-(S.traitCareful?1:0),0,CONST.MAX_EXPOSURE);
   const ero=Math.round(me.stats.exposure*CONST.EXPOSURE_EROSION*RANK_YIELD[me.rank]);
   if(ero) me.stats.favor=Math.max(0,me.stats.favor-ero);
   me.tenure++;
@@ -1237,6 +1237,60 @@ const BIGCASE={
          return [{label:'结案归档',desc:'盐商记你人情，御史盯你的轿子。',cost:{},next:0,mark:'done',
            eff:{silver:J(600),exposure:J(15),renown:-J(12),network:J(8)}}];
        }}},
+  post:{minRank:5,
+    1:{title:'驿传案 · 发端',text:'驿站借迎送科敛过往客商，殴伤人命。死者家属拦轿递上了首告。',
+       opts:[
+        {label:'锁驿严查',desc:'驿传是朝廷的血脉，不是谁家的买卖。',cost:{mandate:2},next:2,mark:'investigate'},
+        {label:'抚恤了事',desc:'官账出钱安葬，两边都算有了交代。',cost:{},next:0,mark:'settled',eff:{renown:J(8),merit:-J(10)}},
+       ]},
+    2:{title:'驿传案 · 顺藤',text:'驿丞的胆子是兵部一位郎中给的 —— 驿传归他考成，你参他等于越衙。',
+       opts:[
+        {label:'越衙参奏',desc:'隔级递折是大忌 —— 但人命更大。',cost:{mandate:4},next:3,mark:'imperial'},
+        {label:'就地撤换驿丞',desc:'动得了的先动，动不了的记下。',cost:{mandate:2},next:3,mark:'swap'},
+       ]},
+    3:{title:'驿传案 · 定谳',text:'案结。新驿丞上任那日，把「肃静」的牌子擦得很亮。',
+       finale:(vars)=>{
+         if(vars.c2==='imperial') return [{label:'结案归档',desc:'越衙之举，上头记住了，士林也记住了。',cost:{},next:0,mark:'done',
+           eff:{merit:J(25),renown:J(28),network:-J(18),exposure:J(10),favor:(S.mood&&S.mood.type==='qingliu')?J(12):-J(8)}}];
+         return [{label:'结案归档',desc:'疮割掉了，病根还在 —— 但那是别个衙门的事了。',cost:{},next:0,mark:'done',
+           eff:{merit:J(12),renown:J(10),network:-J(4)}}];
+       }}},
+  granary:{minRank:7,
+    1:{title:'仓廪案 · 发端',text:'常平仓盘点：账面存粮与实存差了三成。前任的手脚，也可能只是鼠雀之耗。',
+       opts:[
+        {label:'奏请清仓核减',desc:'账是死的，粮是活的，总要见一见。',cost:{mandate:3},next:2,mark:'audit'},
+        {label:'挪新补旧',desc:'今年的新粮先填进去，账就平了。',cost:{},next:0,mark:'patch',eff:{renown:-J(6),exposure:J(10),network:J(6)}},
+       ]},
+    2:{title:'仓廪案 · 顺藤',text:'仓书与粮商虚出虚入多年，每一张仓单上，都有前任的签字。',
+       opts:[
+        {label:'连前官一并参奏',desc:'他签过字，就该同罪。',cost:{mandate:4},next:3,mark:'allin'},
+        {label:'罚仓吏赔补',desc:'让底下人把窟窿吃下去，面上过得去。',cost:{mandate:1},next:3,mark:'fine'},
+       ]},
+    3:{title:'仓廪案 · 定谳',text:'新粮入仓，仓单重造。你把最后一页压了印。',
+       finale:(vars)=>{
+         if(vars.c2==='allin') return [{label:'结案归档',desc:'度支曹记下了你这一笔 —— 也记下了你得罪的人。',cost:{},next:0,mark:'done',
+           eff:{merit:J(35),renown:J(25),network:-J(15),exposure:J(6),favor:(S.mood&&S.mood.type==='shiwu')?J(12):-J(10)}}];
+         return [{label:'结案归档',desc:'仓吏倾家赔补，粮商毫发无伤。账面从此好看。',cost:{},next:0,mark:'done',
+           eff:{merit:J(15),silver:J(300),renown:-J(6)}}];
+       }}},
+  injustice:{minRank:4,
+    1:{title:'冤狱案 · 发端',text:'死囚临刑喊冤，血书指认真凶另有其人。行刑的时辰，就在三日后。',
+       opts:[
+        {label:'提刑重审',desc:'刀下留人容易，留错了难交代。',cost:{mandate:3},next:2,mark:'retrial'},
+        {label:'如期行刑',desc:'案卷齐全，画押俱全。多事不如守时。',cost:{},next:0,mark:'execute',eff:{favor:J(6),renown:-J(15),exposure:J(20)}},
+       ]},
+    2:{title:'冤狱案 · 重审',text:'重审坐实了刑名师爷与真凶勾结 —— 真凶是本地豪族的独子。',
+       opts:[
+        {label:'依律翻案',desc:'人命面前没有豪族。',cost:{mandate:4},next:3,mark:'overturn'},
+        {label:'收金私了',desc:'豪族愿出重金平息，死者家眷也会得一份。',cost:{},next:3,mark:'bribe'},
+       ]},
+    3:{title:'冤狱案 · 定谳',text:'案卷重写。死囚走出大牢那日，天在下雨。',
+       finale:(vars)=>{
+         if(vars.c2==='overturn') return [{label:'结案归档',desc:'冤情得雪。豪族的报复，也在路上了。',cost:{},next:0,mark:'done',
+           eff:{merit:J(20),renown:J(30),exposure:J(12),favor:(S.mood&&S.mood.type==='qingliu')?J(12):-J(8),network:-J(6)}}];
+         return [{label:'结案归档',desc:'银子很沉。夜里的更声，比往常响。',cost:{},next:0,mark:'done',
+           eff:{silver:J(800),exposure:J(20),renown:-J(15),network:J(10)}}];
+       }}},
 };
 function pushCaseEvent(n){
   const c=S.case; if(!c) return;
@@ -1247,10 +1301,12 @@ function pushCaseEvent(n){
 }
 function maybeBigCase(){
   if(S.case||S.tick<30) return;
-  const pool=Object.keys(BIGCASE).filter(k=>S.me.rank>=BIGCASE[k].minRank);
+  const pool=Object.keys(BIGCASE).filter(k=>S.me.rank>=BIGCASE[k].minRank&&!S.pastCases?.includes(k));
   if(!pool.length) return;
-  if(Math.random()<0.06){
+  if(Math.random()<0.07){
     const key=pick(pool);
+    S.pastCases=S.pastCases||[];
+    S.pastCases.push(key);   // 一案一审：审过的不再来，逼你在不同官阶遇到不同的案子
     S.case={key,stage:1,vars:{}}; pushCaseEvent(1);
   }
 }
@@ -1447,19 +1503,35 @@ function trackPeaks(){
    仇家、故吏、党籍与没洗干净的旧账，一并算在下一代头上 */
 const LEGACY_KEY='daiyan_legacy_v1';
 function loadLegacy(){ try{ const s=localStorage.getItem(LEGACY_KEY); return s?JSON.parse(s):null; }catch(e){ return null; } }
-function legacyRank(l){ return Math.min(5,Math.max(2,Math.floor((l.peak||0)/4))); }
+/** 荫叙起官：父荫定底盘，家声可再抬一级（家声清正的门户，部里总要给几分薄面） */
+function legacyRank(l){
+  let r=Math.min(5,Math.max(2,Math.floor((l.peak||0)/4)));
+  if((l.familyRep||0)>=500) r=Math.min(6,r+1);
+  return r;
+}
+/* 家风：按父亲的收场方式定型 —— 谨守的更谨慎，勋阀的更有面子 */
+const TRAITS={
+  careful:{name:'谨守',tip:'几代宦海沉出来的分寸 —— 暴露自然消退更快。'},
+  aristocrat:{name:'勋阀',tip:'先人挣下的体面 —— 圣眷起点更高。'},
+};
 
 function buildLegacy(){
+  const prev=loadLegacy()||{};
   const rels=S.rels;
   const nm=(id)=>{ const p=byId(id); return p?p.name:null; };
   return {
     name:S.me.name, peak:S.peak||0,
+    // 代数与世系：家声代代累积，清名却要每代重新挣 —— 君子之泽，五世而斩
+    generation:(prev.generation||0)+1,
+    lineage:[...(prev.lineage||[]), S.me.name].slice(-4),
+    familyRep:Math.round((prev.familyRep||0)+evaluate().clean),
     silver:Math.round((S.me.peakSilver||0)*0.3),
     renown:S.me.peakRenown||0, clean:evaluate().clean,
     faction:(S.factions.find(f=>f.id===S.me.faction&&f.leader===0)||{}).name||null,
     enemies:rels.filter(r=>r.to===0&&['rival','nemesis'].includes(r.type)).map(r=>nm(r.from)).filter(Boolean),
     patrons:rels.filter(r=>r.to===0&&['patron','ally','confidant'].includes(r.type)).map(r=>nm(r.from)).filter(Boolean),
     proteges:rels.filter(r=>r.from===0&&r.type==='protege').map(r=>nm(r.to)).filter(Boolean),
+    trait:S.over&&S.over.type==='retire'?'careful':'aristocrat',
   };
 }
 
@@ -1492,7 +1564,12 @@ function applyLegacy(st,leg){
     st.me.faction=st.factions.find(f=>f.name===leg.faction).id;
   }
   st.me.legacyName=leg.name;
-  gaz('system',`你是${leg.name}之后。父荫给了你一个${RANK[r0].grade}${RANK[r0].title}的出身${leg.enemies&&leg.enemies.length?'，也给了你他的仇家':''}。`,0,1);
+  st.me.legacyGen=leg.generation||1;
+  st.me.legacyLineage=leg.lineage&&leg.lineage.length?leg.lineage:[leg.name];
+  if(leg.trait==='careful') st.traitCareful=true;                      // 家风「谨守」：暴露退得更快
+  if(leg.trait==='aristocrat') st.me.stats.favor+=20;                  // 家风「勋阀」：圣眷起点更高
+  const traitTip=TRAITS[leg.trait]?TRAITS[leg.trait].tip:'';
+  gaz('system',`你是${leg.name}之后（${st.me.legacyGen} 世${leg.familyRep>=500?'，家声清正':''}）。父荫给了你一个${RANK[r0].grade}${RANK[r0].title}的出身${leg.enemies&&leg.enemies.length?'，也给了你他的仇家':''}。家风「${(TRAITS[leg.trait]||{}).name||'—'}」—— ${traitTip}`,0,1);
 }
 /* ══════════ 四、界面 ══════════ */
 
@@ -1590,8 +1667,9 @@ function renderOver(){
     <div class="kv"><span>家资峰值</span><span>${e.wealth} 两</span></div>
     <div class="kv"><span>门下与姻亲</span><span>${e.ties} 人${S.me.faction?' · 在党':''}</span></div>
     <h4 class="sec">生平大事</h4>
+    <div class="kv"><span>门第</span><span>${S.me.legacyName?`${S.me.legacyGen||1} 世 · ${esc((S.me.legacyLineage||[S.me.legacyName]).join(' → '))}`:'寒门新起'}</span></div>
     ${milestones.map(g=>`<div class="gaz"><span class="t">${g.tick}</span>${esc(g.text)}</div>`).join('')||'<div class="fine">史册无载。</div>'}
-    ${S.over.type!=='dismiss'?'<div class="fine" style="margin-top:10px">你的家底、故吏与仇家已记入家谱 —— 重开时可选「承先人之荫」，换个名字接着下这盘棋。</div>':''}
+    ${S.over.type!=='dismiss'?'<div class="fine" style="margin-top:10px">家底、故吏与仇家已记入家谱 —— 重开时选「承先人之荫」。家风传「'+(S.over.type==='retire'?'谨守':'勋阀')+'」：'+((S.over.type==='retire'?TRAITS.careful:TRAITS.aristocrat).tip)+'</div>':''}
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       <button class="btn primary" id="ov-new">重开一局</button>
       <button class="btn" id="ov-gaz">翻看完整邸报</button>
@@ -1992,9 +2070,9 @@ function boot(){
   // 有先人余荫时，最前面多一张「承先人之荫」
   const leg=loadLegacy();
   const originList=leg?[{key:'legacy',name:'承先人之荫',
-    desc:`${leg.name} 之后。父荫与父仇，一并继承。`,
+    desc:`${leg.name} 之后${leg.lineage&&leg.lineage.length>1?'（先祖：'+leg.lineage.slice(0,-1).join('、')+'）':''}。父荫与父仇，一并继承。`,
     st:{},res:{silver:Math.min(99999,CONST.START_SILVER+Math.round(leg.silver||0))},
-    legacyChips:[`清名 ${Math.round(leg.clean)>=0?'+':''}${Math.round(leg.clean)}`,`起 ${RANK[legacyRank(leg)].title}`]},...ORIGINS]:ORIGINS;
+    legacyChips:[`第 ${leg.generation||1} 世`,`家声 ${Math.round(leg.familyRep||0)}`,`清名 ${Math.round(leg.clean)>=0?'+':''}${Math.round(leg.clean)}`,`起 ${RANK[legacyRank(leg)].title}`]},...ORIGINS]:ORIGINS;
   $('sp-origins').innerHTML=originList.map(o=>{
     const chips=(o.legacyChips?o.legacyChips.map(c=>`<i>${c}</i>`)
       :Object.keys(o.st).map(k=>`<i>${STAT_NAME[k]} ${o.st[k]>0?'+':''}${o.st[k]}</i>`))
