@@ -379,6 +379,8 @@ const CONST = {
   IMPEACH_WARN: 78, IMPEACH_RATE: 0.22,
   EXPOSURE_DECAY: 7, EXPOSURE_EROSION: 0.18, HEALTH_REGEN: 12,
   CONTESTED_FROM: 4, PROMO_CD: 2,
+  JINGCHA: 24,   // 每隔多少回合一次京察（全朝大考核，末档降级）
+  DEBATE: 12,    // 每隔多少回合一场朝议（站队博弈）
 };
 const CONTESTED_FROM = CONST.CONTESTED_FROM;
 
@@ -526,6 +528,12 @@ const ACTIONS = [
      f.treasury-=take;
      return {eff:{silver:take,renown:-J(9)},log:`你以党魁身份自「${f.name}」公库提银 ${take} 两。同党嘴上不说，心里记着。`}; }},
 
+  {key:'estate',path:'social',name:'置办田产',desc:'买田置庄，岁入细水长流。每一处都带一点「兼并」的名声与风声。',cost:{silver:500},cd:2,
+   req:(C)=>{ if((C.p.estates||0)>=10) return '田庄已置十处 —— 再买，御史的折子就要递上来了。'; return null; },
+   run:(C)=>{ C.p.estates=(C.p.estates||0)+1;
+     return {eff:{renown:-J(6),exposure:J(3,0.5)},
+       log:`你又在城外置了一处田庄（共 ${C.p.estates} 处）。佃户的租子往后按季送来，御史的耳朵也竖起来了。`}; }},
+
   {key:'confide',path:'social',name:'托付心腹',desc:'把一件要紧的私事交给某人去办。办成了，他就是心腹。',cost:{silver:160,mandate:1},cd:2,target:1,
    req:(C)=>C.t?null:'须择一人。',
    run:(C)=>({eff:{network:J(12),guile:J(6)},rel:[[C.t.id,'confidant',30]],
@@ -626,8 +634,20 @@ const EVENTS = [
     {label:'回帖试探',cost:{mandate:1},eff:{guile:12,exposure:14,network:14},desc:'入局容易，出局难。'}]},
 ];
 
-const SURNAMES=['裴','崔','卢','郑','谢','沈','陆','顾','苏','韩','柳','薛','岑','温','卫','蒋','邵','冯','阮','施','秦','许','严','翁','骆','钟','闵','屠','屈','桑'];
-const GIVEN=['延之','明远','子昂','敬亭','元朗','伯谦','仲舒','叔达','季常','怀瑾','承嗣','景行','慎之','从简','守拙','知非','无咎','立本','用之','允恭','弘毅','致远','观澜','抱朴','栖迟','澹如','简之','慎微','守正','清臣','文靖','子渊','公度','彦直','若愚','恒之','行简','省身','履端','慕陶'];
+/* ── 朝议议题：每 12 回合一场，站队按朝中各派势力比掷骰定胜负 ── */
+const DEBATES=[
+  {title:'漕运改折',text:'有司奏请漕粮改折银两，度支称便，挽卒失所。',
+   a:{label:'附议改折',align:'shiwu',desc:'利在国库，怨在沿途万民。'},
+   b:{label:'力陈不可',align:'qingliu',desc:'漕运一动，牵连者众。'}},
+  {title:'西北边饷',text:'边镇告急请饷：或增赋实边，或遣使议和以省费。',
+   a:{label:'主战增饷',align:'jijin',desc:'赋加于田亩，怨在乡野。'},
+   b:{label:'主抚缓征',align:'shoucheng',desc:'岁币换太平，清议骂声不绝。'}},
+  {title:'兴学取士',text:'有司请广兴县学、广额取士，费在官帑，功在十年。',
+   a:{label:'赞成兴学',align:'qingliu',desc:'育才之本，士林所望。'},
+   b:{label:'暂缓糜费',align:'shiwu',desc:'度支吃紧，遽兴大工不智。'}},
+];
+
+const SURNAMES=['裴','崔','卢','郑','谢','沈','陆','顾','苏','韩','柳','薛','岑','温','卫','蒋','邵','冯','阮','施','秦','许','严','翁','骆','钟','闵','屠','屈','桑'];const GIVEN=['延之','明远','子昂','敬亭','元朗','伯谦','仲舒','叔达','季常','怀瑾','承嗣','景行','慎之','从简','守拙','知非','无咎','立本','用之','允恭','弘毅','致远','观澜','抱朴','栖迟','澹如','简之','慎微','守正','清臣','文靖','子渊','公度','彦直','若愚','恒之','行简','省身','履端','慕陶'];
 const FACTION_PLAN=[
   {name:'清议堂',doctrine:'qingliu',motto:'宁鸣而死，不默而生。'},
   {name:'度支局',doctrine:'shiwu',motto:'钱谷不欺人。'},
@@ -957,12 +977,20 @@ function worldTick(){
   S.tick++;
   const me=S.me, r=RANK[me.rank];
   me.res.silver+=r.salary;
+  if(me.estates){
+    // 田庄岁入 —— 你叫置产，御史的折子里叫兼并。
+    // 风声取每处 0.5/回合：要能顶得住一部分自然消退，否则这代价形同虚设
+    me.res.silver+=me.estates*Math.round(r.salary*0.15);
+    me.stats.exposure=clamp(me.stats.exposure+me.estates*0.5,0,CONST.MAX_EXPOSURE);
+  }
   me.res.mandate=r.mandate;
   me.stats.health=clamp(me.stats.health+CONST.HEALTH_REGEN,0,100);
   me.stats.exposure=clamp(me.stats.exposure-CONST.EXPOSURE_DECAY,0,CONST.MAX_EXPOSURE);
   const ero=Math.round(me.stats.exposure*CONST.EXPOSURE_EROSION*RANK_YIELD[me.rank]);
   if(ero) me.stats.favor=Math.max(0,me.stats.favor-ero);
   me.tenure++;
+  if(S.tick%CONST.JINGCHA===0) jingcha();
+  else if(S.tick%CONST.DEBATE===0) spawnDebate();
   if(Math.random()<0.1&&me.stats.health>20) spawnEvent();
 
   npcTick();
@@ -996,6 +1024,12 @@ function npcTick(){
         if(ss.filled>=ss.total){ const v=weakestAt(n.rank+1); if(v) retire(v,`${n.name} 谋得其缺。`); }
         releaseSlots(n.id); n.rank++; n.tenure=0; takeSlot(n,n.rank);
         gaz('promote',`邸报：${n.name} 迁 ${RANK[n.rank].grade}${RANK[n.rank].title}。`);
+        // 门生出息了是要孝敬的 —— 「擢升亲信」的闭环在这里合拢
+        if(S.rels.some(r=>r.from===0&&r.to===n.id&&r.type==='protege')){
+          const gift=Math.round(RANK[n.rank].salary*0.8);
+          S.me.res.silver+=gift; apRel(n.id,0,'protege',8);
+          gaz('social',`${n.name} 既迁 ${RANK[n.rank].title}，孝敬了你 ${gift} 两。门生的出息，就是座主的臂膀。`,0,1);
+        }
       }
     }
     if(Math.random()<(n.rank>=CONTESTED_FROM?0.004:0.002)||n.tenure>420){ retire(n,'年资已深，乞休归里。'); }
@@ -1048,9 +1082,66 @@ function npcSocial(){
   return null;
 }
 
+/* ── 京察：每 24 回合全朝大考核。攒功绩、洗痕迹，都要赶在它之前 ── */
+function jingcha(){
+  const me=S.me;
+  const cap=RANK[me.rank].cap, sc=scoreOf(me.stats);
+  let grade;
+  if(me.stats.exposure>=78||sc<cap*0.5) grade='劣';
+  else if(sc>=cap*1.15) grade='卓异';
+  else grade='平常';
+  if(grade==='卓异'){
+    apply(me,{favor:J(30),renown:J(14)},RANK_YIELD[me.rank]);
+    gaz('system',`京察：你考得「卓异」。堂官在考语里写的是「才守兼优」。`,0,1);
+  }else if(grade==='劣'){
+    if(me.stats.exposure>=78){
+      // 以贪墨名镌级 —— 与落马同罚，但不占三次落马的次数（留个体面）
+      releaseSlots(me.id);
+      me.rank=Math.max(0,me.rank-1); me.tenure=0;
+      me.stats.exposure=45; me.stats.favor=Math.round(me.stats.favor*0.6);
+      if(me.rank>=CONST.CONTESTED_FROM) takeSlot(me,me.rank);
+      S.peak=Math.max(S.peak||0,me.careerPeak=Math.max(me.careerPeak||0,me.rank));
+      gaz('system',`京察：你考得「劣」。以贪墨名镌级，降为 ${RANK[me.rank].grade}${RANK[me.rank].title}。`,0,1);
+    }else{
+      apply(me,{favor:-J(20),renown:-J(10)},RANK_YIELD[me.rank]);
+      gaz('system',`京察：你考得「劣」。考语只有四个字：「才力不及」。`,0,1);
+    }
+  }else{
+    gaz('system','京察：你考得「平常」。不上不下，安如磐石。',0,1);
+  }
+  // 朝臣同受评定：劣者镌级（缺腾出来了），卓异者圣眷加身 —— 朝局每 24 回合大洗一次
+  S.npcs.filter(n=>!n.retired).forEach(n=>{
+    if(Math.random()>=0.15) return;
+    const c=RANK[n.rank].cap, s=scoreOf(n.stats);
+    if(s<c*0.4||n.stats.exposure>90){
+      if(n.rank>0){ releaseSlots(n.id); n.rank--; if(n.rank>=CONST.CONTESTED_FROM) takeSlot(n,n.rank); n.tenure=0; }
+    }else if(s>c*1.2){ n.stats.favor=Math.min(9999,n.stats.favor+30); }
+  });
+}
+
+/* ── 朝议：每 12 回合一场。不问你选的是不是「对的」，问你站的是不是赢的那边 ── */
+function spawnDebate(){
+  if(S.pending.some(e=>e.debate)) return;
+  const t=pick(DEBATES);
+  const pw={qingliu:1,shiwu:1,shoucheng:1,jijin:1};
+  S.npcs.filter(n=>!n.retired&&n.faction).forEach(n=>{
+    const f=S.factions.find(x=>x.id===n.faction); if(f) pw[f.doctrine]+=powerOf(n);
+  });
+  if(S.me.faction){ const mf=S.factions.find(x=>x.id===S.me.faction); if(mf) pw[mf.doctrine]+=powerOf(S.me); }
+  const pa=pw[t.a.align], pb=pw[t.b.align];
+  const pct=Math.round(pa/(pa+pb)*100);
+  S.pending.push({debate:1,key:'debate',title:'朝议 · '+t.title,tick:S.tick,odds:{pa,pb,a:t.a.align,b:t.b.align},
+    text:t.text,
+    opts:[
+      {label:t.a.label,desc:t.a.desc+` 附和者党势约 ${pa}，胜面约 ${pct}%。`,cost:{},side:'a'},
+      {label:t.b.label,desc:t.b.desc+` 附和者党势约 ${pb}，胜面约 ${100-pct}%。`,cost:{},side:'b'},
+      {label:'缄默不语',desc:'不站队，不担责 —— 也分不到站的对的那份功。',cost:{},side:'none'},
+    ]});
+  gaz('system',`朝议起：「${t.title}」。各方都在递帖子拉人。`,0,1);
+}
+
 /** 党内提携：党中有人比你高，才会替你说话；党势越厚，话越管用 */
-function factionTick(){
-  const me=S.me; if(!me.faction||S.over) return;
+function factionTick(){  const me=S.me; if(!me.faction||S.over) return;
   const f=S.factions.find(x=>x.id===me.faction); if(!f) return;
   const mates=S.npcs.filter(n=>n.faction===f.id&&!n.retired);
   if(!mates.length) return;
@@ -1091,18 +1182,32 @@ function resolveEvent(i,oi){
   const ev=S.pending[i]; if(!ev) return {err:'无此事件。'};
   const o=ev.opts[oi]; const me=S.me;
   if(S.over) return {err:'这一局已经收场了。'};
-  const sc=silverScale(me.rank);
-  const need=o.cost.silver?Math.round(o.cost.silver*sc):0;
-  if(o.cost.mandate&&me.res.mandate<o.cost.mandate) return {err:'政令不足。'};
-  if(need&&me.res.silver<need) return {err:`银两不足（需 ${need} 两）。`};
-  if(o.cost.mandate) me.res.mandate-=o.cost.mandate;
-  if(need) me.res.silver=Math.max(0,me.res.silver-need);
-  // 事件的银两收支同按官阶口径换算，否则厚礼在高阶不值一提、在末吏则是一笔巨款
-  const eff={...o.eff};
-  if(eff.silver) eff.silver=Math.round(eff.silver*sc);
-  const ch=apply(me,eff);
+  let ch=null, note='';
+  if(ev.debate){
+    // 朝议胜负按各方党势掷骰 —— 不问你选的是不是「对的」，问你站的是不是赢的那边
+    const odds=ev.odds;
+    const aWins=Math.random()*(odds.pa+odds.pb)<odds.pa;
+    const alignName={qingliu:'清流',shiwu:'实务',shoucheng:'守成',jijin:'激进'};
+    if(o.side==='a') ch=apply(me,aWins?{favor:J(18),renown:J(6)}:{favor:-J(14),renown:-J(6)});
+    else if(o.side==='b') ch=apply(me,!aWins?{favor:J(18),renown:J(6)}:{favor:-J(14),renown:-J(6)});
+    else ch=apply(me,{favor:J(3),merit:J(4)});
+    const right=(o.side==='a'&&aWins)||(o.side==='b'&&!aWins);
+    note=`朝议已定，「${alignName[aWins?odds.a:odds.b]}」一派占了上风 —— 你${
+      o.side==='none'?'袖手旁观':(right?'站对了边':'站错了队')}。`;
+  }else{
+    const sc=silverScale(me.rank);
+    const need=o.cost.silver?Math.round(o.cost.silver*sc):0;
+    if(o.cost.mandate&&me.res.mandate<o.cost.mandate) return {err:'政令不足。'};
+    if(need&&me.res.silver<need) return {err:`银两不足（需 ${need} 两）。`};
+    if(o.cost.mandate) me.res.mandate-=o.cost.mandate;
+    if(need) me.res.silver=Math.max(0,me.res.silver-need);
+    const eff={...o.eff};
+    if(eff.silver) eff.silver=Math.round(eff.silver*sc);
+    ch=apply(me,eff);
+  }
   S.pending.splice(i,1);
   gaz('event',`【${ev.title}】你选择了「${o.label}」。`,0,1);
+  if(note) gaz('event',note,0,1);
   if(Math.random()<impeachRisk(me.stats.exposure)){ const im=doImpeach(me); save(); return {ch,imp:im}; }
   save();
   return {ch};
@@ -1257,7 +1362,8 @@ function renderAll(){
     <div class="kv"><span>功绩分</span><span>${Math.round(scoreOf(me.stats))} / 需 ${me.rank<MAX_RANK?RANK[me.rank+1].cap:'—'}</span></div>
     <div class="kv"><span>权势</span><span>${powerOf(me)}</span></div>
     <div class="kv"><span>官阶巅峰</span><span>${RANK[me.careerPeak||0].title}</span></div>
-    <div class="kv"><span>被弹劾</span><span>${me.impeachCount||0} 次</span></div>`;
+    <div class="kv"><span>被弹劾</span><span>${me.impeachCount||0} 次</span></div>
+    <div class="kv"><span>田庄</span><span>${me.estates?`${me.estates} 处 · 岁入约 ${me.estates*Math.round(r.salary*0.15)} 两`:'无'}</span></div>`;
 
   const st=me.stats, ref=k=>Math.max(100,Math.round(st[k]*1.15),Math.round(r.cap*0.5));
   const bar=(k,cls,max,warn)=>`<div class="stat"><div class="stat-top"><span>${STAT_NAME[k]}</span><span${warn?' class="warn"':''}>${Math.round(st[k])}${max?' / '+max:''}</span></div>
@@ -1389,6 +1495,7 @@ function renderCareer(){
   let h=`<div class="card"><h3>递呈铨选<span class="pill ${ck.ready?'jade':'seal'}">${ck.ready?'可呈':'未达'}</span></h3>
     <div class="fine" style="margin-bottom:10px">${ck.ready?(ck.evict?'缺额已满 —— 呈递之后，将挤走该阶上权势最弱的一名朝臣。':'该阶尚有余缺。'):esc(ck.reason)}</div>
     <div class="kv"><span>打点加成</span><span>${me.grease?`+${Math.round(me.grease*100)}%（本次铨选）`:'无 —— 可去「打点铨曹」'}</span></div>
+    <div class="kv"><span>距京察</span><span>${CONST.JINGCHA-(S.tick%CONST.JINGCHA)} 回合 —— 劣者镌级，卓异加眷</span></div>
     ${me.rank>=MAX_RANK?'<div class="fine" style="margin-top:8px">你已位极人臣。若想收场，可「告病致仕」作一次生平总评。</div>':''}
     <button class="btn primary block" id="btn-promo" style="margin-top:10px" ${ck.ready?'':'disabled'}>递 呈 铨 选</button></div>`;
   h+=`<div class="card"><h3>官阶全表<span class="pill">占用 / 员额</span></h3><div class="tw"><table><tr><th>品级</th><th>官职</th><th>衙门</th><th class="num">缺</th><th class="num">俸</th></tr>`;
@@ -1431,6 +1538,7 @@ function renderWind(){
     ?`已越线 —— 每次行事后 ${Math.round(impeachRisk(me.stats.exposure)*100)}% 遭劾`
     :`未越线（${Math.round(me.stats.exposure)}/${CONST.IMPEACH_WARN}）`}</span></div>`;
   h+=`<div class="kv"><span>落马</span><span>${cnt} / 3 次${cnt>=2?' —— 再有一次便革职为民':''}</span></div>`;
+  h+=`<div class="kv"><span>京察</span><span>${CONST.JINGCHA-(S.tick%CONST.JINGCHA)} 回合后大计（功绩 ${Math.round(scoreOf(me.stats))}，过半为安）</span></div>`;
   if(f) h+=`<div class="kv"><span>本党</span><span>${esc(f.name)} · 党员 ${mates.length} 人 · 公库 ${f.treasury} 两${
     f.leader===0?'（你是党魁）':''}</span></div>`;
   if(foes.length) h+=`<div class="fine" style="margin-top:9px">结怨：`+
@@ -1679,7 +1787,8 @@ boot();
 
 window.__G={getS:()=>S,setS:(o)=>{S=o},doAct,doPromote,doImpeach,worldTick,resolveEvent,readiness,
   scoreOf,powerOf,impeachRisk,freshState,save,load,startGame,ACTIONS,RANKS,EVENTS,slotStats,RANK_YIELD,
-  silverNeedOf,silverScale,verdict,evaluate,endGame,factionTick,createFaction,joinFaction,leaveFaction,donate,trackPeaks};
+  silverNeedOf,silverScale,verdict,evaluate,endGame,factionTick,createFaction,joinFaction,leaveFaction,donate,trackPeaks,
+  jingcha,spawnDebate,resolveEvent,DEBATES};
 })();
 </script>
 </body>

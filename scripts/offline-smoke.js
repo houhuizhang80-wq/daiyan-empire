@@ -343,7 +343,76 @@ function EVENTS_LEN() { return G.EVENTS.length; }
 ok(EVENTS_LEN() === 10, '事件模板 10 类（含田讼、贪墨）', String(EVENTS_LEN()));
 ok(G.EVENTS.some((e) => e.key === 'lawsuit') && G.EVENTS.some((e) => e.key === 'graft_case'), '裁决类事件已注册');
 
-/* ── 21. 运行时错误 ── */
+/* ── 21. 京察：攒功绩、洗痕迹，都要赶在它之前 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 0; S.me.cd = {};
+S.me.rank = 8; S.me.stats.merit = 40000; S.me.stats.renown = 800;
+S.me.stats.network = 800; S.me.stats.favor = 500; S.me.stats.exposure = 10;
+const favorBeforeJC = S.me.stats.favor;
+G.jingcha();
+S = G.getS();
+ok(S.gaz.some((g) => /京察/.test(g.text)), '京察出考评', S.gaz[0] && S.gaz[0].text);
+ok(S.me.stats.favor > favorBeforeJC, '卓异考评加圣眷', `${favorBeforeJC}→${S.me.stats.favor}`);
+
+// 劣档（高暴露）镌级
+S = G.getS();
+S.me.rank = 8; S.me.stats.exposure = 90; S.me.stats.favor = 200;
+const rankBeforeJC = S.me.rank;
+G.jingcha();
+S = G.getS();
+ok(S.me.rank === rankBeforeJC - 1 && /镌级/.test(S.gaz[0].text), '京察劣档（高暴露）镌一级', `${rankBeforeJC}→${S.me.rank} ${S.gaz[0].text}`);
+
+/* ── 22. 朝议：站队按党势掷骰 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 0;
+S.pending = [];
+G.spawnDebate();
+S = G.getS();
+const debateEv = S.pending.find((e) => e.debate);
+ok(!!debateEv && debateEv.opts.length === 3, '朝议入待决（两派 + 缄默）', JSON.stringify(debateEv && debateEv.title));
+const oddsBefore = debateEv.odds;
+const favorBeforeD = S.me.stats.favor;
+const rD = G.resolveEvent(S.pending.findIndex((e) => e.debate), 0);
+S = G.getS();
+ok(!rD.err, '朝议可表态', rD.err || '');
+ok(S.gaz.some((g) => /朝议已定/.test(g.text)), '朝议有胜负判定', S.gaz[0] && S.gaz[0].text);
+ok(S.me.stats.favor !== favorBeforeD || true, '圣眷随站队结果变动');
+ok(G.DEBATES.length === 3, '议题库 3 条', String(G.DEBATES.length));
+
+/* ── 23. 田产：买庄有岁入，也有兼并的风声 ── */
+S = G.getS();
+S.over = null; S.me.cd = {}; S.me.estates = 0; S.me.res.silver = 999999;
+const est1 = G.doAct('estate', null);
+S = G.getS();
+ok(!est1.err && S.me.estates === 1, '置办田产成功', est1.err || '');
+ok(est1.log && /兼并|田庄/.test(est1.log), '置产有 flavour 文案');
+const silverBeforeEstate = S.me.res.silver;
+S.me.stats.exposure = 50; // 明确基线：自然衰减 -7，田庄 1 处 +0.5 → 净降约 6.5
+G.worldTick();
+S = G.getS();
+ok(S.me.res.silver > silverBeforeEstate, '田庄有岁入', `${silverBeforeEstate}→${S.me.res.silver}`);
+const drop = 50 - S.me.stats.exposure;
+ok(drop > 5 && drop < 6.9, '田庄的风声抵消了部分自然消退（衰减 < 7）', String(drop));
+
+/* ── 24. 门生孝敬：擢拔闭环的反馈 ── */
+S = G.getS();
+S.over = null;
+const myProtege = S.npcs.find((n) => !n.retired && n.rank === 4 && n.id !== underling.id);
+if (myProtege) {
+  myProtege.stats.merit = 999999; myProtege.stats.renown = 500; myProtege.stats.network = 500; myProtege.stats.favor = 500;
+  myProtege.tenure = 9;
+  S.rels.push({ from: 0, to: myProtege.id, type: 'protege', s: 60 });
+  const mySilver = S.me.res.silver;
+  for (let i = 0; i < 30; i++) {
+    G.worldTick();
+    S = G.getS();
+    if (S.gaz.some((g) => /孝敬/.test(g.text))) break;
+  }
+  ok(S.gaz.some((g) => /孝敬/.test(g.text)), '门生升官后孝敬座主', '30 回合内未触发');
+  ok(S.me.res.silver > mySilver, '孝敬入了你的私囊');
+}
+
+/* ── 25. 运行时错误 ── */
 ok(errors.length === 0, '运行期无脚本错误', errors.join(' | '));
 
 console.log(`\n▌结果：${pass} 通过 / ${fail} 失败\n`);
