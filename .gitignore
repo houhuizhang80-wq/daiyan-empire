@@ -21,3 +21,7 @@ logs/
 .DS_Store
 Thumbs.db
 *.tsbuildinfo
+
+# 发布产物（deploy 用的单页副本与平台标记文件，不进仓）
+publish_*/
+*.genie
