@@ -1177,9 +1177,10 @@ function spawnDebate(){
   gaz('system',`朝议起：「${t.title}」。各方都在递帖子拉人。`,0,1);
 }
 
-/* ── 大案要案：跨回合事件链，前面的选择决定后面拿到什么牌 ── */
+/* ── 大案要案：跨回合事件链，前面的选择决定后面拿到什么牌 ──
+   段 3 的效果由 finale(vars) 按「段 2 抉择 + 当前圣心」动态生成（BIGCASE 不入存档，可含函数） */
 const BIGCASE={
-  river:{
+  river:{minRank:5,
     1:{title:'河工贪案 · 发端',text:'你治下河工银两层层剥蚀，堤成即溃，灾民塞道。此时一份匿名账册送到案头。',
        opts:[
         {label:'按册彻查',desc:'牵连必广，但堤不能再溃了。',cost:{mandate:3},next:2,mark:'investigate'},
@@ -1191,29 +1192,67 @@ const BIGCASE={
         {label:'只办典史顶罪',desc:'拿两个小吏结案，大员们记你懂事。',cost:{mandate:1},next:3,mark:'small'},
        ]},
     3:{title:'河工贪案 · 定谳',text:'钦案将结。你把案卷誊清，在末页附上了自己的名字。',
-       opts:[{label:'结案归档',desc:'案卷入库，风波入史。',cost:{},next:0,mark:'done'}]},
-  }
+       finale:(vars)=>{
+         if(vars.c2==='imperial'){
+           const loyal=S.mood&&S.mood.type==='qingliu';
+           return [{label:'结案归档',desc:loyal?'圣心正喜直臣 —— 你的名字会进史册。':'上头记下了你这次多嘴。',cost:{},next:0,mark:'done',
+             eff:{merit:40,renown:J(30),network:-J(15),exposure:J(8),favor:loyal?J(15):-J(10)}}];
+         }
+         return [{label:'结案归档',desc:'上头觉得你懂事。账面上滴水不漏。',cost:{},next:0,mark:'done',
+           eff:{merit:15,network:J(12),renown:-J(10)}}];
+       }}},
+  science:{minRank:6,
+    1:{title:'科场案 · 发端',text:'今科誊录生被人买通，一份拟中名单早在放榜前流出。抄件落到了你的案上。',
+       opts:[
+        {label:'封卷彻查',desc:'科场之弊，坏的是取士的根。',cost:{mandate:3},next:2,mark:'investigate'},
+        {label:'佯作不知',desc:'人情不是银子，是往后几十年的照应。',cost:{},next:0,mark:'ignore',eff:{network:J(10),renown:-J(6)}},
+       ]},
+    2:{title:'科场案 · 顺藤',text:'追下去，线头缠上了一位座师的门生 —— 你自己也受过那位座师的照应。',
+       opts:[
+        {label:'开验考籍',desc:'徇私就是徇私，不管挂在谁的名下。',cost:{mandate:4},next:3,mark:'verify'},
+        {label:'只重考本房',desc:'动得越少，塌得越少。',cost:{mandate:2},next:3,mark:'partial'},
+       ]},
+    3:{title:'科场案 · 定谳',text:'贡院封门重验。你坐在堂上，看着一份份考籍翻过来。',
+       finale:(vars)=>{
+         if(vars.c2==='verify') return [{label:'结案归档',desc:'士林称快，座师一系从此视你如仇。',cost:{},next:0,mark:'done',
+           eff:{merit:J(30),renown:J(35),network:-J(20),favor:(S.mood&&S.mood.type==='qingliu')?J(15):-J(8)}}];
+         return [{label:'结案归档',desc:'大事化小。清议有一句话要讲，但终究没讲。',cost:{},next:0,mark:'done',
+           eff:{merit:J(15),network:J(10),renown:-J(8)}}];
+       }}},
+  salt:{minRank:8,
+    1:{title:'盐引案 · 发端',text:'盐引账面亏空二十万引 —— 前任拍拍屁股升迁去了，窟窿现在姓你的姓。',
+       opts:[
+        {label:'清查造册',desc:'丑总要揭，晚揭不如早揭。',cost:{mandate:3},next:2,mark:'audit'},
+        {label:'沿用旧账',desc:'只要你不提，就没人提。直到某一天……',cost:{},next:0,mark:'carryon',eff:{network:J(8),exposure:J(18)}},
+       ]},
+    2:{title:'盐引案 · 顺藤',text:'查实是前任勾结盐商虚报。而他如今是你的上宪，盐商们也托人递了话。',
+       opts:[
+        {label:'据实呈报部里',desc:'账是前任做下的，字却要你来签。',cost:{mandate:4},next:3,mark:'report'},
+        {label:'劝盐商「捐输」填补',desc:'窟窿填平，皆大欢喜 —— 只是银子从哪来？',cost:{},next:3,mark:'extort'},
+       ]},
+    3:{title:'盐引案 · 定谳',text:'案卷归拢，只差你最后一个签。',
+       finale:(vars)=>{
+         if(vars.c2==='report') return [{label:'结案归档',desc:'持正者未必讨好，但账干净了。',cost:{},next:0,mark:'done',
+           eff:{favor:J(12)+((S.mood&&S.mood.type==='shiwu')?J(10):0),renown:J(20),network:-J(12)}}];
+         return [{label:'结案归档',desc:'盐商记你人情，御史盯你的轿子。',cost:{},next:0,mark:'done',
+           eff:{silver:J(600),exposure:J(15),renown:-J(12),network:J(8)}}];
+       }}},
 };
 function pushCaseEvent(n){
   const c=S.case; if(!c) return;
   const st=BIGCASE[c.key][n];
   let opts=st.opts;
-  if(n===3){
-    // 结局效果取决于第二段的抉择：掀盖子还是只拍苍蝇
-    if(c.vars.c2==='imperial'){
-      const loyal=S.mood&&S.mood.type==='qingliu';
-      opts=[{label:'结案归档',desc:loyal?'圣心正喜直臣 —— 你的名字会进史册。':'上头记下了你这次多嘴。',cost:{},next:0,mark:'done',
-        eff:{merit:40,renown:J(30),network:-J(15),exposure:J(8),favor:loyal?J(15):-J(10)}}];
-    }else if(c.vars.c2==='small'){
-      opts=[{label:'结案归档',desc:'上头觉得你懂事。账面上滴水不漏。',cost:{},next:0,mark:'done',
-        eff:{merit:15,network:J(12),renown:-J(10)}}];
-    }
-  }
+  if(n===3&&st.finale) opts=st.finale(c.vars||{});
   S.pending.push({key:`case_${c.key}_${n}`,caseStage:n,title:st.title,text:st.text,tick:S.tick,opts});
 }
 function maybeBigCase(){
-  if(S.case||S.me.rank<5||S.tick<30) return;
-  if(Math.random()<0.06){ S.case={key:'river',stage:1,vars:{}}; pushCaseEvent(1); }
+  if(S.case||S.tick<30) return;
+  const pool=Object.keys(BIGCASE).filter(k=>S.me.rank>=BIGCASE[k].minRank);
+  if(!pool.length) return;
+  if(Math.random()<0.06){
+    const key=pick(pool);
+    S.case={key,stage:1,vars:{}}; pushCaseEvent(1);
+  }
 }
 
 /** 党内提携：党中有人比你高，才会替你说话；党势越厚，话越管用 */
@@ -1528,7 +1567,7 @@ function renderView(){
   else if(TAB==='court') v.innerHTML=renderCourt();
   else if(TAB==='faction') v.innerHTML=renderFaction();
   else if(TAB==='gaz') v.innerHTML=renderGazFull();
-  else v.innerHTML=renderHelp();
+  else { v.innerHTML=renderHelp(); bindSlots(); }
   if(TAB==='acts') bindActs();
   if(TAB==='career') bindCareer();
   if(TAB==='court') bindCourt();
@@ -1798,7 +1837,42 @@ function renderHelp(){
     <b>单机版与联机版的差别</b>：无登录、无聊天、无真人对手，进度存在本机浏览器（localStorage）。
     数值、行动、事件、官阶与联机版同源。<br><br>
     <b>致仕</b>：走投无路时可自请去职，功名人脉恩怨一并归零，从书办重头再来 —— 但官阶巅峰会留在案底。
-  </div></div>`;
+  </div></div>`+renderSlotsCard();
+}
+
+/* ── 存档管理：自动档 + 三个命名槽 ──
+   save/load 本就支持槽位参数，这里补的是「看得见、管得着」的界面 */
+function slotSummary(i){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY+'.'+i);
+    if(!raw) return null;
+    const o=JSON.parse(raw); if(!o||!o.me) return null;
+    return {name:o.me.name,rank:o.me.rank,tick:o.tick||0};
+  }catch(e){ return null; }
+}
+function renderSlotsCard(){
+  let h=`<div class="card"><h3>存档管理<span class="pill">自动档 + 3 手动槽</span></h3>
+    <div class="kv"><span>自动档</span><span>${esc(S.me.name)} · ${RANK[S.me.rank].title} · 第 ${S.tick} 回合</span></div>
+    <div class="fine" style="margin:4px 0 10px">自动档随回合覆盖；手动槽用于开岔路（比如参劾前先存一份）。承先人之荫读的是「最近一次收场」，不占槽位。</div>`;
+  for(let i=1;i<=3;i++){
+    const s=slotSummary(i);
+    h+=`<div class="kv"><span>档位 ${i}</span><span>${s?esc(s.name)+' · '+RANK[s.rank].title+' · 第 '+s.tick+' 回合':'（空）'}</span></div>
+      <div style="display:flex;gap:6px;margin:4px 0 12px;flex-wrap:wrap">
+        <button class="btn sm" data-slot="${i}" data-act="load" ${s?'':'disabled'}>读取</button>
+        <button class="btn sm" data-slot="${i}" data-act="save">存入当前</button>
+        <button class="btn sm" data-slot="${i}" data-act="del" ${s?'':'disabled'}>删除</button>
+      </div>`;
+  }
+  h+=`</div>`;
+  return h;
+}
+function bindSlots(){
+  [...document.querySelectorAll('[data-slot]')].forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.slot, act=b.dataset.act;
+    if(act==='save'){ if(save(i)){ toast(`已存入档位 ${i}。`); renderAll(); } }
+    else if(act==='load'){ if(load(i)){ toast('已读取该档位。'); renderAll(); } else toast('该档位为空。','bad'); }
+    else if(act==='del'){ try{ localStorage.removeItem(SAVE_KEY+'.'+i); }catch(e){} toast(`档位 ${i} 已删除。`); renderAll(); }
+  });
 }
 
 /* ── 待决事件 ── */
@@ -1958,7 +2032,7 @@ boot();
 window.__G={getS:()=>S,setS:(o)=>{S=o},doAct,doPromote,doImpeach,worldTick,resolveEvent,readiness,
   scoreOf,powerOf,impeachRisk,freshState,save,load,startGame,ACTIONS,RANKS,EVENTS,slotStats,RANK_YIELD,
   silverNeedOf,silverScale,verdict,evaluate,endGame,factionTick,createFaction,joinFaction,leaveFaction,donate,trackPeaks,
-  jingcha,spawnDebate,resolveEvent,DEBATES,MOODS,moodEff,pushCaseEvent,applyVariant,loadLegacy,applyLegacy,VARIANTS};
+  jingcha,spawnDebate,resolveEvent,DEBATES,MOODS,moodEff,pushCaseEvent,applyVariant,loadLegacy,applyLegacy,VARIANTS,BIGCASE};
 })();
 </script>
 </body>

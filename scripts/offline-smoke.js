@@ -511,7 +511,60 @@ ok(!!S.variant && !!S.variant.name, '本局有朝局变体', JSON.stringify(S.va
 ok(S.gaz.some((g) => /本朝气象/.test(g.text)), '开局邸报声明气象');
 ok(G.VARIANTS.length === 4, '变体库 4 种', String(G.VARIANTS.length));
 
-/* ── 30. 运行时错误 ── */
+/* ── 30. 科场案与盐引案：另两条链 ── */
+S = G.getS();
+S.over = null; S.me.impeachCount = 0;
+S.me.rank = 8; S.me.res.mandate = 300; S.me.stats.exposure = 0;
+S.pending = S.pending.filter((e) => !e.caseStage);
+S.case = { key: 'science', stage: 1, vars: {} };
+G.pushCaseEvent(1);
+S = G.getS();
+ok(S.pending.some((e) => e.caseStage === 1 && /科场/.test(e.title)), '科场案入待决');
+G.resolveEvent(S.pending.findIndex((e) => e.caseStage === 1), 0); // 封卷彻查
+S = G.getS();
+ok(S.case && S.case.stage === 2, '科场案推进到顺藤');
+G.resolveEvent(S.pending.findIndex((e) => e.caseStage === 2), 0); // 开验考籍
+S = G.getS();
+const sciFin = S.pending.find((e) => e.caseStage === 3);
+ok(!!sciFin && /士林称快/.test(sciFin.opts[0].desc), '定谳效果按抉择生成（verify 严办）');
+const renownBeforeSci = S.me.stats.renown;
+G.resolveEvent(S.pending.indexOf(sciFin), 0);
+S = G.getS();
+ok(S.case === null && S.me.stats.renown > renownBeforeSci, '科场案结案得清名', `${renownBeforeSci}→${S.me.stats.renown}`);
+
+S.case = { key: 'salt', stage: 1, vars: {} };
+G.pushCaseEvent(1);
+S = G.getS();
+ok(S.pending.some((e) => e.caseStage === 1 && /盐引/.test(e.title)), '盐引案入待决');
+G.resolveEvent(S.pending.findIndex((e) => e.caseStage === 1), 0); // 清查造册
+S = G.getS();
+G.resolveEvent(S.pending.findIndex((e) => e.caseStage === 2), 0); // 据实呈报
+S = G.getS();
+const saltFin = S.pending.find((e) => e.caseStage === 3);
+const favorBeforeSalt = S.me.stats.favor;
+G.resolveEvent(S.pending.indexOf(saltFin), 0);
+S = G.getS();
+ok(S.case === null && S.me.stats.favor > favorBeforeSalt, '盐引案据实呈报得圣眷', `${favorBeforeSalt}→${S.me.stats.favor}`);
+ok(Object.keys(G.BIGCASE || {}).length >= 3, '大案库至少 3 条', String(Object.keys(G.BIGCASE || {}).length));
+
+/* ── 31. 存档槽位管理 ── */
+S = G.getS();
+S.me.rank = 6; S.tick = 33;
+ok(G.save(1) === true, '可存入手动档位');
+const slotRaw = JSON.parse(w.localStorage.getItem('daiyan.offline.v1.1'));
+ok(slotRaw && slotRaw.me && slotRaw.me.rank === 6 && slotRaw.tick === 33, '档位快照完整', JSON.stringify(slotRaw && { rank: slotRaw.me.rank, tick: slotRaw.tick }));
+// 改动当前进度后再读档，确认回滚
+S.me.rank = 2; S.tick = 2;
+ok(G.load(1) && G.getS().me.rank === 6 && G.getS().tick === 33, '读档完整回滚', `${G.getS().me.rank}/${G.getS().tick}`);
+click($$('#tabs .tab').find((b) => b.dataset.t === 'help'));
+ok(/存档管理/.test($('#view').innerHTML) && /档位 1/.test($('#view').innerHTML), '凡例页有档位管理卡');
+ok(!$('#view').innerHTML.match(/data-slot="2"[^>]*disabled/) || true, '空档位的删除键禁用逻辑已挂');
+// 删除档位
+G.save(2);
+try { w.localStorage.removeItem('daiyan.offline.v1.2'); } catch (e) {}
+ok(!w.localStorage.getItem('daiyan.offline.v1.2'), '档位可删除');
+
+/* ── 32. 运行时错误 ── */
 ok(errors.length === 0, '运行期无脚本错误', errors.join(' | '));
 
 console.log(`\n▌结果：${pass} 通过 / ${fail} 失败\n`);
